@@ -5,12 +5,15 @@ import (
 	"os"
 
 	"github.com/IslamCHup/coworking-manager-project/internal/config"
+	"github.com/IslamCHup/coworking-manager-project/internal/logging"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
 
-	db := config.SetupDataBase()
+	logger := logging.InitLogger()
+
+	db := config.SetupDataBase(logger)
 
 	if err := db.AutoMigrate(); err != nil {
 	}
