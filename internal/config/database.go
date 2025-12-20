@@ -9,14 +9,14 @@ import (
 	"gorm.io/gorm"
 )
 
-func SetupDataBase() {
+func SetupDataBase() *gorm.DB{
 
 	if err := godotenv.Load(".env"); err != nil {
 		panic(err)
 	}
 
 	dbUser := os.Getenv("DB_USER")
-	dbPass := os.Getenv("DB_PASS")
+	dbPass := os.Getenv("DB_PASSWORD")
 	dbHost := os.Getenv("DB_HOST")
 	dbName := os.Getenv("DB_NAME")
 	dbPort := os.Getenv("DB_PORT")
@@ -27,4 +27,10 @@ func SetupDataBase() {
 		DSN:                  dsn,
 		PreferSimpleProtocol: true, // disables implicit prepared statement usage
 	}), &gorm.Config{})
+
+	if err != nil{
+		panic(err)
+	}
+
+	return db
 }
