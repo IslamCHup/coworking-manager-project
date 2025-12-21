@@ -1,19 +1,25 @@
 package models
 
-import "time"
-
 type User struct {
 	Base
 
-	Email         string    `json:"email" gorm:"uniqueIndex;not null" binding:"required,email"`
-	PasswordHash  string    `json:"-" gorm:"not null"`
-	FirstName     string    `json:"first_name" gorm:"not null" binding:"required,min=2"`
-	LastName      string    `json:"last_name" gorm:"not null" binding:"required,min=2"`
-	Balance       float64   `json:"balance" gorm:"not null;default:0"`
-	IsBlocked     bool      `json:"-" gorm:"not null;default:false"`
-	EmailVerified bool      `json:"-" gorm:"not null;default:false"`
-	CreatedAt     time.Time `json:"created_at"`
+	Phone     string `gorm:"uniqueIndex;not null"`
+	FirstName string
+	LastName  string
+	IsBlocked bool `gorm:"default:false"`
 
 	Bookings []Booking `json:"-"`
 	Reviews  []Review  `json:"-"`
+}
+
+type UserResponseDTO struct {
+	ID        uint   `json:"id"`
+	Phone     string `json:"phone"`
+	FirstName string `json:"first_name"`
+	LastName  string `json:"last_name"`
+}
+
+type UserUpdateDTO struct {
+	FirstName *string `json:"first_name"`
+	LastName  *string `json:"last_name"`
 }
