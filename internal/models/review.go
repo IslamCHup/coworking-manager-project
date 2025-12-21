@@ -16,3 +16,9 @@ type Review struct {
 	Place Place  `json:"-"`
 	Admin *Admin `json:"-"`
 }
+type PlaceRatingId struct{
+	PlaceId uint
+	Rating int
+	Text string
+	CreatedAt time.Time
+}

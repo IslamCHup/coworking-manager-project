@@ -23,3 +23,10 @@ type Booking struct {
 	User  User  `json:"-"`
 	Place Place `json:"-"`
 }
+
+type BookingStatusUser struct {
+	UserID    uint
+	PlaceID   uint
+	StartTime time.Time
+	EndTime   time.Time
+}
