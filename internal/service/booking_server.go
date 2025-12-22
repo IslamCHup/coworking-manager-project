@@ -11,6 +11,8 @@ import (
 
 type BookingService interface {
 	Create(req models.BookingReqDTO) (*models.Booking, error)
+	GetBookingById(id uint) (*models.BookingResDTO, error)
+	DeleteBooking(id uint) error 
 }
 
 type bookingService struct {
@@ -23,7 +25,7 @@ func NewBookingService(repo repository.BookingRepository, logger *slog.Logger) B
 }
 
 func (s *bookingService) Create(req models.BookingReqDTO) (*models.Booking, error) {
-// исправить если другой прайс
+	// надо исправить если другой прайс
 	priceHour := 100
 
 	booking := &models.Booking{
@@ -41,7 +43,7 @@ func (s *bookingService) Create(req models.BookingReqDTO) (*models.Booking, erro
 	}
 
 	price := durationHours * float64(priceHour)
-	
+
 	booking.TotalPrice = math.Round(price*100) / 100
 
 	if booking.Status == "" {
@@ -60,4 +62,51 @@ func (s *bookingService) Create(req models.BookingReqDTO) (*models.Booking, erro
 	}
 
 	return booking, nil
+}
+
+func (s *bookingService) GetBookingById(id uint) (*models.BookingResDTO, error) {
+	booking, err := s.repo.GetBookingById(id)
+
+	if err != nil {
+		s.logger.Error("failed to get booking from repository")
+		return nil, err
+	}
+
+	if booking == nil {
+		s.logger.Error("booking not found")
+		return nil, errors.New("booking not found")
+	}
+
+	bookingResDTO := &models.BookingResDTO{
+		ID:         booking.ID,
+		UserID:     booking.UserID,
+		PlaceID:    booking.PlaceID,
+		StartTime:  booking.StartTime,
+		EndTime:    booking.EndTime,
+		TotalPrice: booking.TotalPrice,
+		Status:     string(booking.Status),
+		//place сделать дто после как ее доделают
+		Place: booking.Place,
+	}
+
+	bookingResDTO.User = &models.UserResponseDTO{
+		ID:        booking.User.ID,
+		Phone:     booking.User.Phone,
+		FirstName: booking.User.FirstName,
+		LastName:  booking.User.LastName,
+	}
+	s.logger.Info("get booking by id completed")
+
+	return bookingResDTO, nil
+}
+
+func (s *bookingService) DeleteBooking(id uint) error {
+	if err := s.repo.Delete(id); err != nil {
+		s.logger.Error("failed delete record")
+		return err
+	}
+
+	s.logger.Info("booking deleted")
+
+	return nil
 }
