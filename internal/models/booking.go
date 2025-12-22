@@ -23,3 +23,4 @@ type Booking struct {
 	User  User  `json:"-"`
 	Place Place `json:"-"`
 }
+
