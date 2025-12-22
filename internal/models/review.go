@@ -17,14 +17,7 @@ type Review struct {
 	Admin *Admin `json:"-"`
 }
 type PlaceRatingId struct{
-	PlaceId uint
 	Rating int
 	Text string
 	CreatedAt time.Time
 } 
-type PlaceRatingIdUpdate struct{
-	PlaceId uint
-	Rating int
-	Text string
-	CreatedAt time.Time
-}
