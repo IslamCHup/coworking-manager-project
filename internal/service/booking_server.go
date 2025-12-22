@@ -16,14 +16,16 @@ type BookingService interface {
 type bookingService struct {
 	repo   repository.BookingRepository
 	logger *slog.Logger
-	ratePerHour float64
 }
 
-func NewBookingService(repo repository.BookingRepository, logger *slog.Logger, ratePerHour float64) BookingService {
-	return &bookingService{repo: repo, logger: logger, ratePerHour: ratePerHour}
+func NewBookingService(repo repository.BookingRepository, logger *slog.Logger) BookingService {
+	return &bookingService{repo: repo, logger: logger}
 }
 
 func (s *bookingService) Create(req models.BookingReqDTO) (*models.Booking, error) {
+// исправить если другой прайс
+	priceHour := 100
+
 	booking := &models.Booking{
 		UserID:     req.UserID,
 		PlaceID:    req.PlaceID,
@@ -33,14 +35,13 @@ func (s *bookingService) Create(req models.BookingReqDTO) (*models.Booking, erro
 		Status:     req.Status,
 	}
 
-	// вычисляем цену: разница во времени (в часах) * ставка за час
 	durationHours := booking.EndTime.Sub(booking.StartTime).Hours()
 	if durationHours <= 0 {
 		return nil, errors.New("invalid booking time range: end must be after start")
 	}
 
-	price := durationHours * s.ratePerHour
-	// округлим до 2 знаков
+	price := durationHours * float64(priceHour)
+	
 	booking.TotalPrice = math.Round(price*100) / 100
 
 	if booking.Status == "" {

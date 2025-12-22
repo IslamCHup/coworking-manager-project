@@ -19,6 +19,13 @@ func NewBookingHandler(service service.BookingService, logger *slog.Logger) *Boo
 	return &BookingHandler{service: service, logger: logger}
 }
 
+func (h BookingHandler) RegisterRoutes(r *gin.Engine){
+	booking := r.Group("booking")
+	{
+		booking.POST("/", h.Create)
+	}
+}
+
 func (h *BookingHandler) Create(c *gin.Context) {
 
 	var req models.BookingReqDTO
