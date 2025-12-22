@@ -24,14 +24,27 @@ type Booking struct {
 }
 
 type BookingReqDTO struct {
-    UserID    uint          `json:"user_id" binding:"required"`
-    PlaceID   uint          `json:"place_id" binding:"required"`
-    StartTime time.Time     `json:"start_time" binding:"required"`
-    EndTime   time.Time     `json:"end_time" binding:"required,gtfield=StartTime"`
+	UserID    uint      `json:"user_id" binding:"required"`
+	PlaceID   uint      `json:"place_id" binding:"required"`
+	StartTime time.Time `json:"start_time" binding:"required"`
+	EndTime   time.Time `json:"end_time" binding:"required,gtfield=StartTime"`
 
-    TotalPrice float64       `json:"-" binding:"-"`
-    Status     BookingStatus `json:"status"`
+	TotalPrice float64       `json:"-" binding:"-"`
+	Status     BookingStatus `json:"status"`
 
-    User  *User  `json:"-" binding:"-"`
-    Place *Place `json:"-" binding:"-"`
+	User  *User  `json:"-" binding:"-"`
+	Place *Place `json:"-" binding:"-"`
+}
+
+type BookingResDTO struct {
+	ID         uint      `json:"id"`
+	UserID     uint      `json:"user_id"`
+	PlaceID    uint      `json:"place_id"`
+	StartTime  time.Time `json:"start_time"`
+	EndTime    time.Time `json:"end_time"`
+	TotalPrice float64   `json:"total_price"`
+	Status     string    `json:"status"`
+
+	User  *UserResponseDTO `json:"user,omitempty"`
+	Place *Place           `json:"place,omitempty"`
 }
