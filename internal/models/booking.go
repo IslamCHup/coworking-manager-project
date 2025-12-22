@@ -24,9 +24,3 @@ type Booking struct {
 	Place Place `json:"-"`
 }
 
-type BookingStatusUser struct {
-	UserID    uint
-	PlaceID   uint
-	StartTime time.Time
-	EndTime   time.Time
-}
