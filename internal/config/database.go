@@ -33,7 +33,7 @@ func SetupDataBase(logger *slog.Logger) *gorm.DB {
 
 	db, err := gorm.Open(postgres.New(postgres.Config{
 		DSN:                  dsn,
-		PreferSimpleProtocol: true, // disables implicit prepared statement usage
+		PreferSimpleProtocol: true, 
 	}), &gorm.Config{})
 
 	if err != nil {
