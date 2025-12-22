@@ -20,7 +20,7 @@ func NewBookingHandler(service service.BookingService, logger *slog.Logger) *Boo
 }
 
 func (h BookingHandler) RegisterRoutes(r *gin.Engine){
-	booking := r.Group("booking")
+	booking := r.Group("/booking")
 	{
 		booking.POST("/", h.Create)
 	}
