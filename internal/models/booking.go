@@ -49,14 +49,22 @@ type BookingResDTO struct {
 	Place *Place           `json:"place,omitempty"`
 }
 
+type BookingUpdateDTO struct {
+	UserID    *uint          `json:"user_id"`
+	PlaceID   *uint          `json:"place_id"`
+	StartTime *time.Time     `json:"start_time"`
+	EndTime   *time.Time     `json:"end_time"`
+	Status    *BookingStatus `json:"status"`
+}
+
 type FilterBooking struct {
 	Status    *string    `form:"status"`
-	PriceMin  *float64  `form:"price_min"`
-	PriceMax  *float64  `form:"price_max"`
+	PriceMin  *float64   `form:"price_min"`
+	PriceMax  *float64   `form:"price_max"`
 	StartTime *time.Time `form:"start_time" time_format:"2006-01-02 15"`
 	EndTime   *time.Time `form:"end_time"   time_format:"2006-01-02 15"`
-	Limit     int       `form:"limit"`
-	Offset    int       `form:"offset"`
-	SortBy    string    `form:"sort_by"`
-	Order     string    `form:"order"`
+	Limit     int        `form:"limit"`
+	Offset    int        `form:"offset"`
+	SortBy    string     `form:"sort_by"`
+	Order     string     `form:"order"`
 }

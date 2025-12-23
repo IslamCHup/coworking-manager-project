@@ -12,6 +12,7 @@ import (
 type BookingService interface {
 	Create(req models.BookingReqDTO) (*models.Booking, error)
 	GetBookingById(id uint) (*models.BookingResDTO, error)
+	UpdateBooking(id uint, req models.BookingUpdateDTO) error
 	DeleteBooking(id uint) error
 	ListBooking(filter *models.FilterBooking) (*[]models.Booking, error)
 }
@@ -99,6 +100,61 @@ func (s *bookingService) GetBookingById(id uint) (*models.BookingResDTO, error) 
 	s.logger.Info("get booking by id completed")
 
 	return bookingResDTO, nil
+}
+
+func (s *bookingService) UpdateBooking(id uint, req models.BookingUpdateDTO) error {
+	booking, err := s.repo.GetBookingById(id)
+	if err != nil {
+		s.logger.Error(
+			"booking not found",
+			"booking_id", id,
+			"error", err,
+		)
+		return err
+	}
+
+	if req.UserID != nil {
+		booking.UserID = *req.UserID
+	}
+
+	if req.PlaceID != nil {
+		booking.PlaceID = *req.PlaceID
+	}
+
+	if req.StartTime != nil {
+		booking.StartTime = *req.StartTime
+	}
+
+	if req.EndTime != nil {
+		booking.EndTime = *req.EndTime
+	}
+
+	if req.Status != nil {
+		booking.Status = *req.Status
+	}
+
+	// Пересчитываем цену, если изменилось время
+	if req.StartTime != nil || req.EndTime != nil {
+		durationHours := booking.EndTime.Sub(booking.StartTime).Hours()
+		if durationHours <= 0 {
+			return errors.New("invalid booking time range: end must be after start")
+		}
+		priceHour := 100
+		price := durationHours * float64(priceHour)
+		booking.TotalPrice = math.Round(price*100) / 100
+	}
+
+	if err := s.repo.UpdateBooking(booking); err != nil {
+		s.logger.Error(
+			"UpdateBooking failed",
+			"booking_id", id,
+			"error", err,
+		)
+		return err
+	}
+
+	s.logger.Info("UpdateBooking success", "booking_id", id)
+	return nil
 }
 
 func (s *bookingService) DeleteBooking(id uint) error {

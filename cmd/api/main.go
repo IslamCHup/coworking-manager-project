@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/IslamCHup/coworking-manager-project/internal/config"
@@ -18,23 +17,38 @@ func main() {
 
 	db := config.SetupDataBase(logger)
 	if db == nil {
-		logger.Error("database setup failed: db is nil")
+		logger.Error("Ошибка при установке базы данных: db is nil")
 	}
 
-	if err := db.AutoMigrate(&models.Booking{}); err != nil {
-		logger.Error("auto migrate failed", "error", err)
-		panic(fmt.Sprintf("не удалось выполнить миграцию:%v", err))
+	// Автомиграция моделей
+	if err := db.AutoMigrate(
+		&models.Admin{},
+		&models.User{},
+		&models.Booking{},
+		&models.Review{},
+		&models.Place{},
+		&models.PhoneVerification{},
+		&models.RefreshToken{},
+	); err != nil {
+		logger.Error("Ошибка при выполнении автомиграции", "error", err)
+		return
 	}
 
+	// Инициализация репозиториев
 	bookingRepo := repository.NewBookingRepository(db, logger)
+	adminRepo := repository.NewAdminRepository(db, logger)
+	userRepo := repository.NewUserRepository(db, logger)
 
+	// Инициализация сервисов
 	bookingService := service.NewBookingService(bookingRepo, logger)
+	adminService := service.NewAdminService(adminRepo, logger)
+	userService := service.NewUserService(userRepo, logger)
 
 	r := gin.Default()
 
-	transport.RegisterRoutes(r, logger, bookingService)
+	transport.RegisterRoutes(r, logger, bookingService, adminService, userService)
 
-	logger.Info("starting HTTP server", "port", os.Getenv("PORT"))
+	logger.Info("Запуск HTTP-сервера", "port", os.Getenv("PORT"))
 	if err := r.Run(":" + os.Getenv("PORT")); err != nil {
 		logger.Error("не удалось запустить HTTP-сервер", "err", err)
 	}
