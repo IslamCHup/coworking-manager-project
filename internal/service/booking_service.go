@@ -12,7 +12,8 @@ import (
 type BookingService interface {
 	Create(req models.BookingReqDTO) (*models.Booking, error)
 	GetBookingById(id uint) (*models.BookingResDTO, error)
-	DeleteBooking(id uint) error 
+	DeleteBooking(id uint) error
+	ListBooking(filter *models.FilterBooking) (*[]models.Booking, error)
 }
 
 type bookingService struct {
@@ -109,4 +110,16 @@ func (s *bookingService) DeleteBooking(id uint) error {
 	s.logger.Info("booking deleted")
 
 	return nil
+}
+
+func (s *bookingService) ListBooking(filter *models.FilterBooking) (*[]models.Booking, error) {
+	bookings, err := s.repo.ListBooking(filter)
+
+	if err != nil {
+		s.logger.Error("")
+		return nil, err
+	}
+
+	s.logger.Info("ListBooking success")
+	return bookings, nil
 }
