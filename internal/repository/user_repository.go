@@ -13,6 +13,7 @@ type UserRepository interface {
 	CreateUser(req *models.User) error
 	UpdateUser(req *models.User) error
 	DeleteUser(id uint) error
+	GetAllUsers() ([]models.User, error)
 }
 
 type userRepository struct {
@@ -30,7 +31,7 @@ func NewUserRepository(db *gorm.DB, logger *slog.Logger) UserRepository {
 func (r *userRepository) GetUserByID(id uint) (*models.User, error) {
 	var user models.User
 
-	if err := r.db.First(&user, id).Error; err != nil {
+	if err := r.db.Preload("Bookings").First(&user, id).Error; err != nil {
 
 		r.logger.Error("GetByID failed", "user_id", id, "error", err)
 		return nil, err
@@ -97,4 +98,16 @@ func (r *userRepository) DeleteUser(id uint) error {
 	}
 	r.logger.Info("DeleteUser success", "id", id, "rows", res.RowsAffected)
 	return nil
+}
+
+func (r *userRepository) GetAllUsers() ([]models.User, error) {
+	var users []models.User
+
+	if err := r.db.Find(&users).Error; err != nil {
+		r.logger.Error("GetAllUsers failed", "error", err)
+		return nil, err
+	}
+
+	r.logger.Info("GetAllUsers success", "count", len(users))
+	return users, nil
 }

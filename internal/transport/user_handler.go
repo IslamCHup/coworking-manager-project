@@ -58,3 +58,26 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	h.logger.Info("UpdateUser success", "user_id", userID)
 	c.JSON(http.StatusOK, gin.H{"message": "user updated"})
 }
+
+func (h *UserHandler) GetAllUsers(c *gin.Context) {
+	h.logger.Info("GetAllUsers request received")
+
+	users, err := h.service.GetAllUsers()
+	if err != nil {
+		h.logger.Error(
+			"GetAllUsers request failed",
+			"error", err,
+		)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "failed to get users",
+		})
+		return
+	}
+
+	h.logger.Info(
+		"GetAllUsers request success",
+		"count", len(users),
+	)
+
+	c.JSON(http.StatusOK, users)
+}
