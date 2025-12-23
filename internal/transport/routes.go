@@ -29,7 +29,7 @@ func RegisterRoutes(
 	adminHandler := NewAdminHandler(userService, bookingService, logger)
 	adminHandler.RegisterRoutes(router, adminService)
 
-	reviewHandler := NewReviewHandler(reviewService)
+	reviewHandler := NewReviewHandler(reviewService, logger)
 
 	protected := router.Group("/")
 	protected.Use(middleware.AuthMiddleware())
