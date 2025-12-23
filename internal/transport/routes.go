@@ -16,6 +16,7 @@ func RegisterRoutes(
 	userService service.UserService,
 	authService service.AuthService,
 	refreshService service.RefreshService,
+	reviewService service.ReviewService,
 ) {
 	bookingHandler := NewBookingHandler(bookingService, logger)
 	bookingHandler.RegisterRoutes(router)
@@ -28,9 +29,14 @@ func RegisterRoutes(
 	adminHandler := NewAdminHandler(userService, bookingService, logger)
 	adminHandler.RegisterRoutes(router, adminService)
 
+	reviewHandler := NewReviewHandler(reviewService)
+
 	protected := router.Group("/")
 	protected.Use(middleware.AuthMiddleware())
 
 	users := protected.Group("/users")
 	userHandler.RegisterRoutes(users)
+
+	reviews := protected.Group("/reviews")
+	reviews.POST("/", reviewHandler.CreateReview)
 }

@@ -65,6 +65,7 @@ func main() {
 	placeRepo := repository.NewPlaceRepository(db, logger)
 	refreshRepo := repository.NewRefreshTokenRepository(db, logger)
 	phoneRepo := repository.NewPhoneVerificationRepository(db, logger)
+	reviewRepo := repository.NewReviewRepository(db)
 
 	// Инициализация сервисов
 	bookingService := service.NewBookingService(bookingRepo, placeRepo, db, logger)
@@ -72,10 +73,11 @@ func main() {
 	userService := service.NewUserService(userRepo, logger)
 	authService := service.NewAuthService(phoneRepo, userRepo, logger, smsSender)
 	refreshService := service.NewRefreshService(refreshRepo, logger)
+	reviewService := service.NewReviewService(db, reviewRepo)
 
 	r := gin.Default()
 
-	transport.RegisterRoutes(r, logger, bookingService, adminService, userService, authService, refreshService)
+	transport.RegisterRoutes(r, logger, bookingService, adminService, userService, authService, refreshService, reviewService)
 
 	logger.Info("Запуск HTTP-сервера", "port", os.Getenv("PORT"))
 	if err := r.Run(":" + os.Getenv("PORT")); err != nil {

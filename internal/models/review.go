@@ -17,6 +17,8 @@ type Review struct {
 	Admin *Admin `json:"-"`
 }
 type PlaceRatingId struct {
+	UserID    uint
+	PlaceId   uint
 	Rating    int
 	Text      string
 	CreatedAt time.Time
