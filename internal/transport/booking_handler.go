@@ -26,6 +26,7 @@ func (h BookingHandler) RegisterRoutes(r *gin.Engine) {
 		booking.POST("/", h.Create)
 		booking.GET("/:id", h.GetByID)
 		booking.DELETE("/:id", h.DeleteBooking)
+		booking.GET("/", h.ListBooking)
 	}
 }
 
@@ -87,25 +88,49 @@ func (h *BookingHandler) Create(c *gin.Context) {
 
 	var req models.BookingReqDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
-		if h.logger != nil {
-			h.logger.Error("CreateBooking invalid body", "error", err)
-		}
+		h.logger.Error("CreateBooking invalid body", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	booking, err := h.service.Create(req)
 	if err != nil {
-		if h.logger != nil {
-			h.logger.Error("CreateBooking failed", "error", err)
-		}
+		h.logger.Error("CreateBooking failed", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err})
+		return
+	}
+
+	h.logger.Info("CreateBooking success", "booking_id", booking.ID)
+
+	c.JSON(http.StatusCreated, booking)
+}
+
+func (h *BookingHandler) ListBooking(c *gin.Context) {
+	var q models.FilterBooking
+
+	if err := c.ShouldBindQuery(&q); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if h.logger != nil {
-		h.logger.Info("CreateBooking success", "booking_id", booking.ID)
+	filter := models.FilterBooking{
+		Status:    q.Status,
+		PriceMin:  q.PriceMin,
+		PriceMax:  q.PriceMax,
+		StartTime: q.StartTime,
+		EndTime:   q.EndTime,
+		Limit:     q.Limit,
+		Offset:    q.Offset,
+		SortBy:    q.SortBy,
+		Order:     q.Order,
 	}
 
-	c.JSON(http.StatusCreated, booking)
+	booking, err := h.service.ListBooking(&filter)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, booking)
 }
