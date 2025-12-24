@@ -2,18 +2,17 @@ package service
 
 import (
 	"errors"
-
 	"time"
 
 	"github.com/IslamCHup/coworking-manager-project/internal/models"
 	"github.com/IslamCHup/coworking-manager-project/internal/repository"
 	"gorm.io/gorm"
 )
-var ( ErrReviewNotFound = errors.New("error")) 
+var ErrReviewNotFound = errors.New("review not found") 
 type ReviewService interface {
 	CreateReview(req *models.Review) (*models.Review, error)
-	GetReviewId(id uint) (*models.Review,error)
-	UpdateReview(id uint, req models.Review) (*models.Review,error)
+	GetReviewId(id uint) (*models.Review, error)
+	UpdateReview(id uint, req models.UpdateReviewDTO) (*models.Review, error)
 	// DeleteReview(id uint)error
 }
 type reviewService struct {
@@ -32,10 +31,10 @@ func (s *reviewService) CreateReview(req *models.Review) (*models.Review, error)
 		return nil, errors.New("текст не может быть пустым")
 	}
 	if len(req.Text) < 5 {
-		return nil, errors.New("текст не может быть меньше 5 симловов ")
+		return nil, errors.New("текст не может быть меньше 5 символов")
 	}
 	if len(req.Text) > 300 {
-		return nil, errors.New("текст не может быть больше 300 симловов ")
+		return nil, errors.New("текст не может быть больше 300 символов")
 	}
 	if req.UserID == 0 {
 		return nil, errors.New("пользователь не найден")
@@ -57,24 +56,43 @@ func (s *reviewService) CreateReview(req *models.Review) (*models.Review, error)
 	return review, nil
 
 }
-func (s*reviewService) GetReviewId(id uint) (*models.Review,error){
-review,err:=  s.review.GetReview(id)
-if err!=nil{
-	if errors.Is(err,gorm.ErrRecordNotFound){
+func (s *reviewService) GetReviewId(id uint) (*models.Review, error) {
+	review, err := s.review.GetReview(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+		return nil, ErrReviewNotFound
+	}
+	return review, nil
+}
+func (s *reviewService) UpdateReview(id uint, req models.UpdateReviewDTO) (*models.Review, error) {
+	review, err := s.review.GetReview(id)
+	if err != nil {
 		return nil, err
 	}
-	return nil,ErrReviewNotFound
-}
-return review,nil
-}
-func (s *reviewService) UpdateReview(id uint, v models.Review) (*models.Review,error) {
-	review,err:= s.review.GetReview(id)
-	if err!=nil{
-		return nil,err
+
+	if req.Text != "" {
+		if len(req.Text) < 5 {
+			return nil, errors.New("текст не может быть меньше 5 символов")
+		}
+		if len(req.Text) > 300 {
+			return nil, errors.New("текст не может быть больше 300 символов")
+		}
+		review.Text = req.Text
 	}
-	if review ==nil{
-		return nil,errors.New("ничего не написано для обновления")
+
+	if req.Rating != 0 {
+		if req.Rating < 1 || req.Rating > 5 {
+			return nil, errors.New("рейтинг должен быть от 1 до 5")
+		}
+		review.Rating = req.Rating
 	}
-	return review,nil
-	
+
+	err = s.review.UpdateReview(review)
+	if err != nil {
+		return nil, err
+	}
+
+	return review, nil
 }

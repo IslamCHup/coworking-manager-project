@@ -16,14 +16,14 @@ type Review struct {
 	Place Place  `json:"-"`
 	Admin *Admin `json:"-"`
 }
-type PlaceRequestRatingId struct {
-	UserID    uint
-	PlaceId   uint
-	Rating    int  
-	Text      string
-	CreatedAt time.Time
+type PlaceRequestRatingIdDto struct {
+	UserID    uint   `json:"user_id" gorm:"not null;index"`
+	PlaceId   uint  `json:"place_id" gorm:"not null;index" binding:"required"`
+	Rating    int   `json:"rating" gorm:"not null;check:rating >= 1 AND rating <= 5" binding:"required,min=1,max=5"`
+	Text      string `json:"text" gorm:"not null" binding:"required,min=5"`
+	CreatedAt time.Time `json:"created_at"`
 }
-type UpdateReview struct{
-	Rating int
-	Text string
+type UpdateReviewDTO struct {
+	Rating int    `json:"rating,omitempty"`
+	Text   string `json:"text,omitempty"`
 }

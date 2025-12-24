@@ -24,7 +24,7 @@ func (h *ReviewHandler) RegisterRoutesReview(r *gin.Engine) {
 	{
 		review.POST("/", h.CreateReview)
 		review.GET("/:id", h.GetByID)
-		// review.PUT("/:id", h.UpdateReview)
+		 review.PUT("/:id", h.UpdateReview)
 	}
 }
 
@@ -94,45 +94,58 @@ func (h *ReviewHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, review)
 }
 
-// func (h *ReviewHandler) UpdateReview(c *gin.Context) {
-// 	userID, exists := c.Get("user_id")
-// 	if !exists {
-// 		c.JSON(http.StatusUnauthorized, gin.H{
-// 			"error": "пользователь не авторизован",
-// 		})
-// 		return
-// 	}
+func (h *ReviewHandler) UpdateReview(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "пользователь не авторизован",
+		})
+		return
+	}
 
-// 	userIDUint, ok := userID.(uint)
-// 	if !ok || userIDUint == 0 {
-// 		c.JSON(http.StatusUnauthorized, gin.H{
-// 			"error": "неверный идентификатор пользователя",
-// 		})
-// 		return
-// 	}
+	userIDUint, ok := userID.(uint)
+	if !ok || userIDUint == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "неверный идентификатор пользователя",
+		})
+		return
+	}
 
-// 	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
-// 	if err != nil {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-// 		return
-// 	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
 
-// 	var req models.UpdateReview
-// 	if err := c.ShouldBindJSON(&req); err != nil {
-// 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-// 		return
-// 	}
+	var req models.UpdateReviewDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
+	review, err := h.review.GetReviewId(uint(id))
+	if err != nil {
+		h.logger.Error("failed to get review", "id", id, "error", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "отзыв не найден"})
+		return
+	}
 
-// 	review, err := h.review.UpdateReview(userIDUint, uint(id), req)
-// 	if err != nil {
-// 		h.logger.Error("failed to update review", "id", id, "user_id", userIDUint, "error", err)
-// 		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось обновить отзыв"})
-// 		return
-// 	}
+	if review.UserID != userIDUint {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "нет доступа к этому отзыву",
+		})
+		return
+	}
 
-// 	c.JSON(http.StatusOK, gin.H{
-// 		"message": "отзыв успешно обновлен",
-// 		"review":  review,
-// 	})
-// }
+	updatedReview, err := h.review.UpdateReview(uint(id), req)
+	if err != nil {
+		h.logger.Error("failed to update review", "id", id, "user_id", userIDUint, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось обновить отзыв"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "отзыв успешно обновлен",
+		"review":  updatedReview,
+	})
+}
