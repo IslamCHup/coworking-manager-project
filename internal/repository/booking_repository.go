@@ -12,7 +12,7 @@ import (
 type BookingRepository interface {
 	CreateBooking(req *models.Booking) error
 	ListBooking(filter *models.FilterBooking) (*[]models.Booking, error)
-	// UpdateBook(req *models.Booking) error
+	UpdateBooking(req *models.Booking) error
 	Delete(id uint) error
 	GetBookingById(id uint) (*models.Booking, error)
 }
@@ -56,6 +56,23 @@ func (r *bookingRepository) GetBookingById(id uint) (*models.Booking, error) {
 	r.logger.Debug("booking successfully retrieved", "id", booking.ID)
 
 	return &booking, nil
+}
+
+func (r *bookingRepository) UpdateBooking(req *models.Booking) error {
+	if err := r.db.Save(req).Error; err != nil {
+		r.logger.Error(
+			"failed to update booking",
+			"booking_id", req.ID,
+			"error", err,
+		)
+		return err
+	}
+
+	r.logger.Info(
+		"booking updated",
+		"booking_id", req.ID,
+	)
+	return nil
 }
 
 func (r *bookingRepository) Delete(id uint) error {
