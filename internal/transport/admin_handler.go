@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -9,6 +10,7 @@ import (
 	"github.com/IslamCHup/coworking-manager-project/internal/service"
 	"github.com/IslamCHup/coworking-manager-project/internal/transport/middleware"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 type AdminHandler struct {
@@ -75,6 +77,10 @@ func (h *AdminHandler) UpdateUser(c *gin.Context) {
 
 	if err := h.userService.UpdateUser(uint(userID), req); err != nil {
 		h.logger.Error("UpdateUser failed", "user_id", userID, "error", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update user"})
 		return
 	}
@@ -94,6 +100,10 @@ func (h *AdminHandler) DeleteUser(c *gin.Context) {
 
 	if err := h.userService.DeleteUser(uint(userID)); err != nil {
 		h.logger.Error("DeleteUser failed", "user_id", userID, "error", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete user"})
 		return
 	}
@@ -120,6 +130,10 @@ func (h *AdminHandler) UpdateBooking(c *gin.Context) {
 
 	if err := h.bookingService.UpdateBooking(uint(bookingID), req); err != nil {
 		h.logger.Error("UpdateBooking failed", "booking_id", bookingID, "error", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "booking not found"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to update booking"})
 		return
 	}
@@ -139,6 +153,10 @@ func (h *AdminHandler) DeleteBooking(c *gin.Context) {
 
 	if err := h.bookingService.DeleteBooking(uint(bookingID)); err != nil {
 		h.logger.Error("DeleteBooking failed", "booking_id", bookingID, "error", err)
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "booking not found"})
+			return
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete booking"})
 		return
 	}

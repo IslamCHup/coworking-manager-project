@@ -18,17 +18,26 @@ type BookingService interface {
 }
 
 type bookingService struct {
-	repo   repository.BookingRepository
-	logger *slog.Logger
+	repo      repository.BookingRepository
+	placeRepo repository.PlaceRepository
+	logger    *slog.Logger
 }
 
-func NewBookingService(repo repository.BookingRepository, logger *slog.Logger) BookingService {
-	return &bookingService{repo: repo, logger: logger}
+func NewBookingService(repo repository.BookingRepository, placeRepo repository.PlaceRepository, logger *slog.Logger) BookingService {
+	return &bookingService{
+		repo:      repo,
+		placeRepo: placeRepo,
+		logger:    logger,
+	}
 }
 
 func (s *bookingService) Create(req models.BookingReqDTO) (*models.Booking, error) {
-	// надо исправить если другой прайс
-	priceHour := 100
+	// Загружаем Place для получения цены за час
+	place, err := s.placeRepo.GetPlaceByID(req.PlaceID)
+	if err != nil {
+		s.logger.Error("Place not found", "place_id", req.PlaceID, "error", err)
+		return nil, errors.New("place not found")
+	}
 
 	booking := &models.Booking{
 		UserID:     req.UserID,
@@ -44,8 +53,8 @@ func (s *bookingService) Create(req models.BookingReqDTO) (*models.Booking, erro
 		return nil, errors.New("invalid booking time range: end must be after start")
 	}
 
-	price := durationHours * float64(priceHour)
-
+	// Используем PricePerHour из Place
+	price := durationHours * place.PricePerHour
 	booking.TotalPrice = math.Round(price*100) / 100
 
 	if booking.Status == "" {
@@ -117,8 +126,20 @@ func (s *bookingService) UpdateBooking(id uint, req models.BookingUpdateDTO) err
 		booking.UserID = *req.UserID
 	}
 
+	// Если изменился PlaceID, загружаем новый Place
 	if req.PlaceID != nil {
 		booking.PlaceID = *req.PlaceID
+		// Загружаем новый Place для получения актуальной цены
+		newPlace, err := s.placeRepo.GetPlaceByID(*req.PlaceID)
+		if err != nil {
+			s.logger.Error(
+				"place not found",
+				"place_id", *req.PlaceID,
+				"error", err,
+			)
+			return errors.New("place not found")
+		}
+		booking.Place = newPlace
 	}
 
 	if req.StartTime != nil {
@@ -133,14 +154,30 @@ func (s *bookingService) UpdateBooking(id uint, req models.BookingUpdateDTO) err
 		booking.Status = *req.Status
 	}
 
-	// Пересчитываем цену, если изменилось время
-	if req.StartTime != nil || req.EndTime != nil {
+	// Пересчитываем цену, если изменилось время или PlaceID
+	if req.StartTime != nil || req.EndTime != nil || req.PlaceID != nil {
 		durationHours := booking.EndTime.Sub(booking.StartTime).Hours()
 		if durationHours <= 0 {
 			return errors.New("invalid booking time range: end must be after start")
 		}
-		priceHour := 100
-		price := durationHours * float64(priceHour)
+
+		// Используем PricePerHour из Place
+		// Если Place не загружен (не менялся PlaceID), загружаем его
+		if booking.Place == nil {
+			place, err := s.placeRepo.GetPlaceByID(booking.PlaceID)
+			if err != nil {
+				s.logger.Error(
+					"place not found",
+					"place_id", booking.PlaceID,
+					"error", err,
+				)
+				return errors.New("place not found")
+			}
+			booking.Place = place
+		}
+
+		pricePerHour := booking.Place.PricePerHour
+		price := durationHours * pricePerHour
 		booking.TotalPrice = math.Round(price*100) / 100
 	}
 
