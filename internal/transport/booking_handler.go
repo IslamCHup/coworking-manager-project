@@ -144,7 +144,7 @@ func (h *BookingHandler) Update(c *gin.Context) {
 		return
 	}
 
-	if err := h.service.UpdateBooking(uint(id), &req); err != nil {
+	if err := h.service.UpdateBook(uint(id), &req); err != nil {
 		h.logger.Error("UpdateBooking failed", "error", err, "id", id)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

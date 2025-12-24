@@ -14,11 +14,10 @@ import (
 type BookingService interface {
 	Create(id uint, req models.BookingReqDTO) (*models.Booking, error)
 	GetBookingById(id uint) (*models.BookingResDTO, error)
-	UpdateBooking(id uint, req models.BookingUpdateDTO) error
 	DeleteBooking(id uint) error
 	ListBooking(filter *models.FilterBooking) (*[]models.Booking, error)
-	UpdateBooking(id uint, req *models.BookingReqUpdateDTO) error
-	UpdateStatus(id uint, status models.BookingStatusDTO) error 
+	UpdateBook(id uint, req *models.BookingReqUpdateDTO) error
+	UpdateStatus(id uint, status models.BookingStatusDTO) error
 }
 
 type bookingService struct {
@@ -147,89 +146,6 @@ func (s *bookingService) GetBookingById(id uint) (*models.BookingResDTO, error) 
 	return bookingResDTO, nil
 }
 
-func (s *bookingService) UpdateBooking(id uint, req models.BookingUpdateDTO) error {
-	booking, err := s.repo.GetBookingById(id)
-	if err != nil {
-		s.logger.Error(
-			"booking not found",
-			"booking_id", id,
-			"error", err,
-		)
-		return err
-	}
-
-	if req.UserID != nil {
-		booking.UserID = *req.UserID
-	}
-
-	// Если изменился PlaceID, загружаем новый Place
-	if req.PlaceID != nil {
-		booking.PlaceID = *req.PlaceID
-		// Загружаем новый Place для получения актуальной цены
-		newPlace, err := s.placeRepo.GetPlaceByID(*req.PlaceID)
-		if err != nil {
-			s.logger.Error(
-				"place not found",
-				"place_id", *req.PlaceID,
-				"error", err,
-			)
-			return errors.New("place not found")
-		}
-		booking.Place = newPlace
-	}
-
-	if req.StartTime != nil {
-		booking.StartTime = *req.StartTime
-	}
-
-	if req.EndTime != nil {
-		booking.EndTime = *req.EndTime
-	}
-
-	if req.Status != nil {
-		booking.Status = *req.Status
-	}
-
-	// Пересчитываем цену, если изменилось время или PlaceID
-	if req.StartTime != nil || req.EndTime != nil || req.PlaceID != nil {
-		durationHours := booking.EndTime.Sub(booking.StartTime).Hours()
-		if durationHours <= 0 {
-			return errors.New("invalid booking time range: end must be after start")
-		}
-
-		// Используем PricePerHour из Place
-		// Если Place не загружен (не менялся PlaceID), загружаем его
-		if booking.Place == nil {
-			place, err := s.placeRepo.GetPlaceByID(booking.PlaceID)
-			if err != nil {
-				s.logger.Error(
-					"place not found",
-					"place_id", booking.PlaceID,
-					"error", err,
-				)
-				return errors.New("place not found")
-			}
-			booking.Place = place
-		}
-
-		pricePerHour := booking.Place.PricePerHour
-		price := durationHours * pricePerHour
-		booking.TotalPrice = math.Round(price*100) / 100
-	}
-
-	if err := s.repo.UpdateBooking(booking); err != nil {
-		s.logger.Error(
-			"UpdateBooking failed",
-			"booking_id", id,
-			"error", err,
-		)
-		return err
-	}
-
-	s.logger.Info("UpdateBooking success", "booking_id", id)
-	return nil
-}
-
 func (s *bookingService) DeleteBooking(id uint) error {
 	if err := s.repo.Delete(id); err != nil {
 		s.logger.Error("failed delete record")
@@ -253,7 +169,7 @@ func (s *bookingService) ListBooking(filter *models.FilterBooking) (*[]models.Bo
 	return bookings, nil
 }
 
-func (s *bookingService) UpdateBooking(id uint, req *models.BookingReqUpdateDTO) error {
+func (s *bookingService) UpdateBook(id uint, req *models.BookingReqUpdateDTO) error {
 	booking, err := s.repo.GetBookingById(id)
 	if err != nil {
 		if s.logger != nil {
@@ -335,12 +251,12 @@ func (s *bookingService) UpdateStatus(id uint, status models.BookingStatusDTO) e
 	}
 
 	statusClear := models.BookingStatus(strings.ToLower(strings.TrimSpace(string(status.Status))))
-	
+
 	booking.Status = statusClear
-	
+
 	switch statusClear {
 	case models.BookingActive, models.BookingNonActive, models.BookingCancelled:
-		if err := s.repo.UpdateBook(booking.ID, booking); err != nil{
+		if err := s.repo.UpdateBook(booking.ID, booking); err != nil {
 			return err
 		}
 		return nil
