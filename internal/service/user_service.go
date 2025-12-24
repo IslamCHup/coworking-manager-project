@@ -12,6 +12,7 @@ type UserService interface {
 	UpdateUser(userID uint, req models.UserUpdateDTO) error
 	DeleteUser(userID uint) error
 	GetAllUsers() ([]models.UserResponseDTO, error)
+	UpdateUserBalance(userID uint, amount int) error
 }
 
 type userService struct {
@@ -52,6 +53,7 @@ func (s *userService) GetUserByID(userID uint) (*models.UserResponseDTO, error) 
 		Phone:     user.Phone,
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
+		Balance:   user.Balance,
 		Bookings:  bookings,
 	}, nil
 }
@@ -116,8 +118,18 @@ func (s *userService) GetAllUsers() ([]models.UserResponseDTO, error) {
 			Phone:     u.Phone,
 			FirstName: u.FirstName,
 			LastName:  u.LastName,
+			Balance:   u.Balance,
 		})
 	}
 
 	return result, nil
+}
+
+func (s *userService) UpdateUserBalance(userID uint, amount int) error {
+	if err := s.repo.UpdateUserBalance(userID, amount); err != nil {
+		s.logger.Error("UpdateUserBalance failed", "user_id", userID, "amount", amount, "error", err)
+		return err
+	}
+	s.logger.Info("UpdateUserBalance success", "user_id", userID, "amount", amount)
+	return nil
 }

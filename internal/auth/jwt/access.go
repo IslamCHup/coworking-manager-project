@@ -41,7 +41,7 @@ func GenerateAccessToken(userID uint) (string, error) {
 
 func ParseAccessToken(tokenString string) (*AccessClaims, error) {
 	if tokenString == "" {
-		return nil, errors.New("token is empty")
+		return nil, errors.New("токен не указан")
 	}
 
 	accessSecret, err := getAccessSecret()
@@ -54,7 +54,7 @@ func ParseAccessToken(tokenString string) (*AccessClaims, error) {
 		&AccessClaims{},
 		func(t *jwt.Token) (interface{}, error) {
 			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, errors.New("unexpected signing method")
+				return nil, errors.New("неожиданный метод подписи")
 			}
 			return accessSecret, nil
 		},
@@ -66,7 +66,7 @@ func ParseAccessToken(tokenString string) (*AccessClaims, error) {
 
 	claims, ok := token.Claims.(*AccessClaims)
 	if !ok || !token.Valid {
-		return nil, errors.New("invalid token")
+		return nil, errors.New("неверный токен")
 	}
 
 	return claims, nil

@@ -41,7 +41,7 @@ func main() {
 	placeRepo := repository.NewPlaceRepository(db, logger)
 
 	// Инициализация сервисов
-	bookingService := service.NewBookingService(bookingRepo, placeRepo, logger)
+	bookingService := service.NewBookingService(bookingRepo, placeRepo, db, logger)
 	adminService := service.NewAdminService(adminRepo, logger)
 	userService := service.NewUserService(userRepo, logger)
 

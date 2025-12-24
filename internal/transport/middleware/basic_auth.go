@@ -17,7 +17,7 @@ func AdminBasicAuthMiddleware(adminService service.AdminService, logger *slog.Lo
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
 			c.Header("WWW-Authenticate", `Basic realm="admin"`)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "authorization required"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "требуется авторизация"})
 			c.Abort()
 			return
 		}
@@ -25,7 +25,7 @@ func AdminBasicAuthMiddleware(adminService service.AdminService, logger *slog.Lo
 		// Проверяем, что заголовок начинается с "Basic "
 		if !strings.HasPrefix(authHeader, "Basic ") {
 			c.Header("WWW-Authenticate", `Basic realm="admin"`)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization header format"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "неверный формат заголовка авторизации"})
 			c.Abort()
 			return
 		}
@@ -35,7 +35,7 @@ func AdminBasicAuthMiddleware(adminService service.AdminService, logger *slog.Lo
 		decoded, err := base64.StdEncoding.DecodeString(encoded)
 		if err != nil {
 			c.Header("WWW-Authenticate", `Basic realm="admin"`)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization credentials"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "неверные учетные данные авторизации"})
 			c.Abort()
 			return
 		}
@@ -44,7 +44,7 @@ func AdminBasicAuthMiddleware(adminService service.AdminService, logger *slog.Lo
 		credentials := strings.SplitN(string(decoded), ":", 2)
 		if len(credentials) != 2 {
 			c.Header("WWW-Authenticate", `Basic realm="admin"`)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid authorization credentials format"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "неверный формат учетных данных авторизации"})
 			c.Abort()
 			return
 		}
@@ -57,7 +57,7 @@ func AdminBasicAuthMiddleware(adminService service.AdminService, logger *slog.Lo
 		if err != nil {
 			logger.Warn("Admin authentication failed", "login", login, "error", err)
 			c.Header("WWW-Authenticate", `Basic realm="admin"`)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid login or password"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "неверный логин или пароль"})
 			c.Abort()
 			return
 		}
