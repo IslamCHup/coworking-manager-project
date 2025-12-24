@@ -18,7 +18,7 @@ type Booking struct {
 	PlaceID    uint          `json:"place_id" gorm:"not null;index" binding:"required"`
 	StartTime  time.Time     `json:"start_time" gorm:"not null;index" binding:"required"`
 	EndTime    time.Time     `json:"end_time" gorm:"not null;index" binding:"required,gtfield=StartTime"`
-	TotalPrice float64       `json:"total_price" gorm:"not null"`
+	TotalPrice int           `json:"total_price" gorm:"not null"` // в копейках
 	Status     BookingStatus `json:"status" gorm:"not null;default:'non_active'" binding:"oneof=active cancelled non_active"`
 
 	User  *User  `json:"user,omitempty" gorm:"foreignKey:UserID"`
@@ -33,14 +33,18 @@ type BookingReqDTO struct {
 }
 
 type BookingReqUpdateDTO struct {
-	UserID    *uint          `json:"user_id,omitempty"`
-	PlaceID   *uint          `json:"place_id,omitempty"`
-	StartTime *string        `json:"start_time,omitempty"`
-	EndTime   *string        `json:"end_time,omitempty"`
+	UserID    *uint   `json:"user_id,omitempty"`
+	PlaceID   *uint   `json:"place_id,omitempty"`
+	StartTime *string `json:"start_time,omitempty"`
+	EndTime   *string `json:"end_time,omitempty"`
 }
 
-type BookingStatusDTO struct{
-	Status    BookingStatus `json:"status,omitempty" binding:"oneof=active cancelled non_active"` 
+type BookingStatusDTO struct {
+	Status BookingStatus `json:"status,omitempty" binding:"oneof=active cancelled non_active"`
+}
+
+type BookingStatusUpdateDTO struct {
+	Status BookingStatus `json:"status" binding:"required,oneof=active cancelled non_active"`
 }
 
 type BookingResDTO struct {
@@ -48,7 +52,7 @@ type BookingResDTO struct {
 	PlaceID    uint      `json:"place_id"`
 	StartTime  time.Time `json:"start_time"`
 	EndTime    time.Time `json:"end_time"`
-	TotalPrice float64   `json:"total_price"`
+	TotalPrice int       `json:"total_price"` // в копейках
 	Status     string    `json:"status"`
 
 	User  *UserResponseDTO `json:"user,omitempty"`
@@ -57,8 +61,8 @@ type BookingResDTO struct {
 
 type FilterBooking struct {
 	Status    *string    `form:"status" binding:"oneof=active cancelled non_active"`
-	PriceMin  *float64   `form:"price_min"`
-	PriceMax  *float64   `form:"price_max"`
+	PriceMin  *int       `form:"price_min"` // в копейках
+	PriceMax  *int       `form:"price_max"` // в копейках
 	StartTime *time.Time `form:"start_time"`
 	EndTime   *time.Time `form:"end_time"  `
 	Limit     int        `form:"limit"`

@@ -51,7 +51,7 @@ func generateRefreshToken() (string, error) {
 
 func (s *refreshService) CreateForUser(userID uint) (string, error) {
 	if userID == 0 {
-		return "", errors.New("invalid user id")
+		return "", errors.New("неверный ID пользователя")
 	}
 
 	if err := s.refreshRepo.DeleteByUserID(userID); err != nil {
@@ -90,7 +90,7 @@ func (s *refreshService) CreateForUser(userID uint) (string, error) {
 
 func (s *refreshService) Refresh(refreshToken string) (string, string, error) {
 	if refreshToken == "" {
-		return "", "", errors.New("refresh token is empty")
+		return "", "", errors.New("refresh token не указан")
 	}
 
 	hash := hashRefreshToken(refreshToken)
@@ -98,13 +98,13 @@ func (s *refreshService) Refresh(refreshToken string) (string, string, error) {
 	stored, err := s.refreshRepo.GetByHash(hash)
 	if err != nil {
 		s.logger.Warn("refresh token not found", "error", err)
-		return "", "", errors.New("invalid refresh token")
+		return "", "", errors.New("неверный refresh token")
 	}
 
 	if time.Now().After(stored.ExpiresAt) {
 		_ = s.refreshRepo.DeleteByHash(hash)
 		s.logger.Warn("refresh token expired", "user_id", stored.UserID)
-		return "", "", errors.New("refresh token expired")
+		return "", "", errors.New("refresh token истек")
 	}
 
 	if err := s.refreshRepo.DeleteByUserID(stored.UserID); err != nil {

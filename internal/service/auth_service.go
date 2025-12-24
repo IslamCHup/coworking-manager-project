@@ -111,13 +111,13 @@ func (s *authService) VerifyPhoneCode(phone string, code string) (uint, error) {
 	code = strings.TrimSpace(code)
 
 	if phone == "" || code == "" {
-		return 0, errors.New("phone or code is empty")
+		return 0, errors.New("телефон или код не указаны")
 	}
 
 	storedHash, expiresAt, attempts, err := s.phoneRepo.GetByPhone(phone)
 	if err != nil {
 		s.logger.Warn("verification not found", "phone", phone, "error", err)
-		return 0, errors.New("code not found")
+		return 0, errors.New("код не найден")
 	}
 
 	if time.Now().After(expiresAt) {
@@ -128,7 +128,7 @@ func (s *authService) VerifyPhoneCode(phone string, code string) (uint, error) {
 				"error", err,
 			)
 		}
-		return 0, errors.New("code expired")
+		return 0, errors.New("код истек")
 	}
 
 	if attempts >= s.maxAttempts {
@@ -147,7 +147,7 @@ func (s *authService) VerifyPhoneCode(phone string, code string) (uint, error) {
 			"attempts", attempts,
 		)
 
-		return 0, errors.New("too many attempts")
+		return 0, errors.New("слишком много попыток")
 	}
 
 	if !compareCodeHash(storedHash, code) {
@@ -158,7 +158,7 @@ func (s *authService) VerifyPhoneCode(phone string, code string) (uint, error) {
 				"error", err,
 			)
 		}
-		return 0, errors.New("invalid code")
+		return 0, errors.New("неверный код")
 	}
 
 	if err := s.phoneRepo.DeleteByPhone(phone); err != nil {

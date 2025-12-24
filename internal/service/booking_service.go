@@ -3,12 +3,12 @@ package service
 import (
 	"errors"
 	"log/slog"
-	"math"
 	"strings"
 	"time"
 
 	"github.com/IslamCHup/coworking-manager-project/internal/models"
 	"github.com/IslamCHup/coworking-manager-project/internal/repository"
+	"gorm.io/gorm"
 )
 
 type BookingService interface {
@@ -18,18 +18,21 @@ type BookingService interface {
 	ListBooking(filter *models.FilterBooking) (*[]models.Booking, error)
 	UpdateBook(id uint, req *models.BookingReqUpdateDTO) error
 	UpdateStatus(id uint, status models.BookingStatusDTO) error
+	UpdateBookingStatusWithBalance(id uint, newStatus models.BookingStatus) error
 }
 
 type bookingService struct {
 	repo      repository.BookingRepository
 	placeRepo repository.PlaceRepository
+	db        *gorm.DB
 	logger    *slog.Logger
 }
 
-func NewBookingService(repo repository.BookingRepository, placeRepo repository.PlaceRepository, logger *slog.Logger) BookingService {
+func NewBookingService(repo repository.BookingRepository, placeRepo repository.PlaceRepository, db *gorm.DB, logger *slog.Logger) BookingService {
 	return &bookingService{
 		repo:      repo,
 		placeRepo: placeRepo,
+		db:        db,
 		logger:    logger,
 	}
 }
@@ -47,7 +50,7 @@ func (s *bookingService) Create(id uint, req models.BookingReqDTO) (*models.Book
 
 	duration := end.Sub(start)
 	if duration <= 0 {
-		return nil, errors.New("invalid booking time range: end must be after start")
+		return nil, errors.New("неверный диапазон времени: время окончания должно быть позже времени начала")
 	}
 
 	if start.Weekday() == time.Saturday || start.Weekday() == time.Sunday {
@@ -64,9 +67,7 @@ func (s *bookingService) Create(id uint, req models.BookingReqDTO) (*models.Book
 
 	bookings, err := s.repo.ListBooking(nil)
 	if err != nil {
-		if s.logger != nil {
-			s.logger.Error("failed to list bookings for overlap check", "error", err)
-		}
+		s.logger.Error("failed to list bookings for overlap check", "error", err)
 		return nil, err
 	}
 	if bookings != nil {
@@ -74,11 +75,7 @@ func (s *bookingService) Create(id uint, req models.BookingReqDTO) (*models.Book
 			if v.PlaceID != req.PlaceID {
 				continue
 			}
-			existingStart := v.StartTime
-			existingEnd := v.EndTime
-			newStart := start
-			newEnd := end
-			if existingStart.Before(newEnd) && existingEnd.After(newStart) && v.Status == models.BookingActive {
+			if v.StartTime.Before(end) && v.EndTime.After(start) && v.Status == models.BookingActive {
 				return nil, errors.New("это время занято другими")
 			}
 		}
@@ -92,21 +89,23 @@ func (s *bookingService) Create(id uint, req models.BookingReqDTO) (*models.Book
 		Status:    models.BookingNonActive,
 	}
 
-	durationHours := booking.EndTime.Sub(booking.StartTime).Hours()
-	price := durationHours * float64(models.PriceHour)
+	// Получаем информацию о месте для расчета цены
+	place, err := s.placeRepo.GetPlaceByID(req.PlaceID)
+	if err != nil {
+		s.logger.Error("failed to get place for price calculation", "place_id", req.PlaceID, "error", err)
+		return nil, errors.New("место не найдено")
+	}
 
-	booking.TotalPrice = math.Round(price*100) / 100
+	durationHours := booking.EndTime.Sub(booking.StartTime).Hours()
+	// Цена в копейках: часы * цена за час места в копейках
+	booking.TotalPrice = int(durationHours * float64(place.PricePerHour))
 
 	if err := s.repo.CreateBooking(booking); err != nil {
-		if s.logger != nil {
-			s.logger.Error("Create booking failed", "error", err, "user_id", req.UserID, "place_id", req.PlaceID)
-		}
+		s.logger.Error("Create booking failed", "error", err, "user_id", req.UserID, "place_id", req.PlaceID)
 		return nil, err
 	}
 
-	if s.logger != nil {
-		s.logger.Info("Create booking success", "booking_id", booking.ID)
-	}
+	s.logger.Info("Create booking success", "booking_id", booking.ID)
 
 	return booking, nil
 }
@@ -121,7 +120,7 @@ func (s *bookingService) GetBookingById(id uint) (*models.BookingResDTO, error) 
 
 	if booking == nil {
 		s.logger.Error("booking not found")
-		return nil, errors.New("booking not found")
+		return nil, errors.New("бронирование не найдено")
 	}
 
 	bookingResDTO := &models.BookingResDTO{
@@ -131,8 +130,7 @@ func (s *bookingService) GetBookingById(id uint) (*models.BookingResDTO, error) 
 		EndTime:    booking.EndTime,
 		TotalPrice: booking.TotalPrice,
 		Status:     string(booking.Status),
-		//place сделать дто после как ее доделают
-		Place: booking.Place,
+		Place:      booking.Place,
 	}
 
 	bookingResDTO.User = &models.UserResponseDTO{
@@ -140,6 +138,7 @@ func (s *bookingService) GetBookingById(id uint) (*models.BookingResDTO, error) 
 		Phone:     booking.User.Phone,
 		FirstName: booking.User.FirstName,
 		LastName:  booking.User.LastName,
+		Balance:   booking.User.Balance,
 	}
 	s.logger.Info("get booking by id completed")
 
@@ -172,9 +171,7 @@ func (s *bookingService) ListBooking(filter *models.FilterBooking) (*[]models.Bo
 func (s *bookingService) UpdateBook(id uint, req *models.BookingReqUpdateDTO) error {
 	booking, err := s.repo.GetBookingById(id)
 	if err != nil {
-		if s.logger != nil {
-			s.logger.Error("failed to get booking for update", "id", id, "error", err)
-		}
+		s.logger.Error("failed to get booking for update", "id", id, "error", err)
 		return err
 	}
 
@@ -205,14 +202,12 @@ func (s *bookingService) UpdateBook(id uint, req *models.BookingReqUpdateDTO) er
 	if req.StartTime != nil || req.EndTime != nil {
 		durationHours := booking.EndTime.Sub(booking.StartTime).Hours()
 		if durationHours <= 0 {
-			return errors.New("invalid booking time range: end must be after start")
+			return errors.New("неверный диапазон времени: время окончания должно быть позже времени начала")
 		}
 
 		bookings, err := s.repo.ListBooking(nil)
 		if err != nil {
-			if s.logger != nil {
-				s.logger.Error("failed to list bookings for overlap check", "error", err)
-			}
+			s.logger.Error("failed to list bookings for overlap check", "error", err)
 			return err
 		}
 		if bookings != nil {
@@ -226,14 +221,19 @@ func (s *bookingService) UpdateBook(id uint, req *models.BookingReqUpdateDTO) er
 			}
 		}
 
-		price := durationHours * float64(models.PriceHour)
-		booking.TotalPrice = math.Round(price*100) / 100
+		// Получаем информацию о месте для расчета цены
+		place, err := s.placeRepo.GetPlaceByID(booking.PlaceID)
+		if err != nil {
+			s.logger.Error("failed to get place for price calculation", "place_id", booking.PlaceID, "error", err)
+			return errors.New("место не найдено")
+		}
+
+		// Цена в копейках: часы * цена за час места в копейках
+		booking.TotalPrice = int(durationHours * float64(place.PricePerHour))
 	}
 
 	if err := s.repo.UpdateBook(id, booking); err != nil {
-		if s.logger != nil {
-			s.logger.Error("failed to update booking", "id", id, "error", err)
-		}
+		s.logger.Error("failed to update booking", "id", id, "error", err)
 		return err
 	}
 
@@ -247,7 +247,7 @@ func (s *bookingService) UpdateStatus(id uint, status models.BookingStatusDTO) e
 	}
 
 	if status.Status == "" {
-		return errors.New("empty status")
+		return errors.New("статус не указан")
 	}
 
 	statusClear := models.BookingStatus(strings.ToLower(strings.TrimSpace(string(status.Status))))
@@ -261,6 +261,83 @@ func (s *bookingService) UpdateStatus(id uint, status models.BookingStatusDTO) e
 		}
 		return nil
 	default:
-		return errors.New("invalid booking status")
+		return errors.New("неверный статус бронирования")
 	}
+}
+
+func (s *bookingService) UpdateBookingStatusWithBalance(id uint, newStatus models.BookingStatus) error {
+	// Начинаем транзакцию
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		// Получаем бронь в рамках транзакции
+		var booking models.Booking
+		if err := tx.Preload("User").Preload("Place").Where("id = ?", id).First(&booking).Error; err != nil {
+			s.logger.Error("failed to get booking in transaction", "booking_id", id, "error", err)
+			return err
+		}
+
+		oldStatus := booking.Status
+		newStatusNormalized := models.BookingStatus(strings.ToLower(strings.TrimSpace(string(newStatus))))
+
+		// Валидация статуса
+		switch newStatusNormalized {
+		case models.BookingActive, models.BookingNonActive, models.BookingCancelled:
+			// OK
+		default:
+			return errors.New("неверный статус бронирования")
+		}
+
+		// Если статус не изменился, ничего не делаем
+		if oldStatus == newStatusNormalized {
+			s.logger.Info("booking status unchanged", "booking_id", id, "status", newStatusNormalized)
+			return nil
+		}
+
+		// TotalPrice уже в копейках
+		priceInCents := booking.TotalPrice
+
+		// Логика для смены статуса на active
+		if newStatusNormalized == models.BookingActive {
+			// Проверяем баланс пользователя
+			if booking.User.Balance < priceInCents {
+				s.logger.Warn("insufficient balance", "user_id", booking.UserID, "balance", booking.User.Balance, "required", priceInCents)
+				return errors.New("недостаточно средств")
+			}
+
+			// Списываем деньги с баланса пользователя
+			if err := tx.Model(&models.User{}).Where("id = ?", booking.UserID).
+				Update("balance", gorm.Expr("balance - ?", priceInCents)).Error; err != nil {
+				s.logger.Error("failed to deduct balance", "user_id", booking.UserID, "error", err)
+				return err
+			}
+
+			s.logger.Info("balance deducted", "user_id", booking.UserID, "amount", priceInCents)
+		}
+
+		// Логика для возврата денег при отмене активной брони
+		if oldStatus == models.BookingActive && (newStatusNormalized == models.BookingCancelled || newStatusNormalized == models.BookingNonActive) {
+			// Возвращаем деньги пользователю
+			if err := tx.Model(&models.User{}).Where("id = ?", booking.UserID).
+				Update("balance", gorm.Expr("balance + ?", priceInCents)).Error; err != nil {
+				s.logger.Error("failed to refund balance", "user_id", booking.UserID, "error", err)
+				return err
+			}
+
+			s.logger.Info("balance refunded", "user_id", booking.UserID, "amount", priceInCents)
+		}
+
+		// Обновляем статус брони
+		booking.Status = newStatusNormalized
+		if err := tx.Model(&models.Booking{}).Where("id = ?", id).Update("status", newStatusNormalized).Error; err != nil {
+			s.logger.Error("failed to update booking status", "booking_id", id, "error", err)
+			return err
+		}
+
+		s.logger.Info("booking status updated with balance transaction",
+			"booking_id", id,
+			"old_status", oldStatus,
+			"new_status", newStatusNormalized,
+			"user_id", booking.UserID)
+
+		return nil
+	})
 }

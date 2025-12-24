@@ -66,10 +66,10 @@ func (h *RefreshHandler) Logout(c *gin.Context) {
 
 	if err := h.refreshService.Logout(req.RefreshToken); err != nil {
 		h.logger.Error("Logout failed", "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "logout failed"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось выйти из системы"})
 		return
 	}
 
 	h.logger.Info("Logout success")
-	c.JSON(http.StatusOK, gin.H{"message": "logged out"})
+	c.JSON(http.StatusOK, gin.H{"message": "выход выполнен успешно"})
 }

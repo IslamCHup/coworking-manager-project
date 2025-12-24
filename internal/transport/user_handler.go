@@ -38,7 +38,7 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 	user, err := h.service.GetUserByID(userID)
 	if err != nil {
 		h.logger.Error("GetUser failed", "user_id", userID, "error", err)
-		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "пользователь не найден"})
 		return
 	}
 
@@ -63,7 +63,7 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 	}
 
 	h.logger.Info("UpdateUser success", "user_id", userID)
-	c.JSON(http.StatusOK, gin.H{"message": "user updated"})
+	c.JSON(http.StatusOK, gin.H{"message": "пользователь обновлен"})
 }
 
 func (h *UserHandler) GetAllUsers(c *gin.Context) {
@@ -76,7 +76,7 @@ func (h *UserHandler) GetAllUsers(c *gin.Context) {
 			"error", err,
 		)
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "failed to get users",
+			"error": "не удалось получить пользователей",
 		})
 		return
 	}

@@ -57,7 +57,7 @@ func (h *AuthHandler) RequestPhoneCode(c *gin.Context) {
 	}
 
 	h.logger.Info("RequestPhoneCode success", "phone", req.Phone)
-	c.JSON(http.StatusOK, gin.H{"message": "code sent"})
+	c.JSON(http.StatusOK, gin.H{"message": "код отправлен"})
 }
 
 func (h *AuthHandler) VerifyPhoneCode(c *gin.Context) {
@@ -76,13 +76,13 @@ func (h *AuthHandler) VerifyPhoneCode(c *gin.Context) {
 	accessToken, err := jwt.GenerateAccessToken(userID)
 	if err != nil {
 		h.logger.Error("GenerateAccessToken failed", "user_id", userID, "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate access token"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось сгенерировать access token"})
 		return
 	}
 
 	refreshToken, err := h.refreshService.CreateForUser(userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to generate refresh token"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось сгенерировать refresh token"})
 		return
 	}
 

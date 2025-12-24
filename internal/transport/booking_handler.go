@@ -36,7 +36,7 @@ func (h *BookingHandler) GetByID(c *gin.Context) {
 	idStr := c.Param("id")
 	if idStr == "" {
 		h.logger.Info("GetBooking invalid id param", "id", idStr)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id param is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "параметр id обязателен"})
 		return
 	}
 
@@ -58,7 +58,7 @@ func (h *BookingHandler) DeleteBooking(c *gin.Context) {
 	idStr := c.Param("id")
 	if idStr == "" {
 		h.logger.Info("DeleteBooking invalid id param", "id", idStr)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id param is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "параметр id обязателен"})
 		return
 	}
 
@@ -131,7 +131,7 @@ func (h *BookingHandler) Update(c *gin.Context) {
 	idStr := c.Param("id")
 	if idStr == "" {
 		h.logger.Info("UpdateBooking invalid id param", "id", idStr)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id param is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "параметр id обязателен"})
 		return
 	}
 
@@ -151,14 +151,14 @@ func (h *BookingHandler) Update(c *gin.Context) {
 	}
 
 	h.logger.Info("UpdateBooking success", "booking_id", id)
-	c.JSON(http.StatusOK, gin.H{"message": "updated"})
+	c.JSON(http.StatusOK, gin.H{"message": "обновлено"})
 }
 
 func (h *BookingHandler) UpdateStatus(c *gin.Context) {
 	idStr := c.Param("id")
 	if idStr == "" {
 		h.logger.Info("GetBooking invalid id param", "id", idStr)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id param is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "параметр id обязателен"})
 		return
 	}
 	id, _ := strconv.ParseUint(idStr, 10, 64)
@@ -175,5 +175,5 @@ func (h *BookingHandler) UpdateStatus(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"message": "updated"})
+	c.JSON(http.StatusOK, gin.H{"message": "обновлено"})
 }

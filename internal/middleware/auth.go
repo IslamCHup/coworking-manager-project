@@ -14,7 +14,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		header := c.GetHeader("Authorization")
 		if header == "" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "missing authorization header",
+				"error": "отсутствует заголовок авторизации",
 			})
 			return
 		}
@@ -22,7 +22,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		parts := strings.Split(header, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "invalid authorization format",
+				"error": "неверный формат авторизации",
 			})
 			return
 		}
@@ -30,7 +30,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		claims, err := authjwt.ParseAccessToken(parts[1])
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
-				"error": "invalid or expired token",
+				"error": "неверный или истекший токен",
 			})
 			return
 		}
