@@ -42,8 +42,8 @@ func NewAuthService(phoneRepo repository.PhoneVerificationRepository,
 		userRepo:    userRepo,
 		smsSender:   smsSender,
 		logger:      logger,
-		codeTTL:     3 * time.Minute,
-		maxAttempts: 5,
+		codeTTL:     60 * time.Minute,
+		maxAttempts: 20,
 	}
 }
 

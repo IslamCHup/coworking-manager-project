@@ -9,25 +9,26 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type RefreshRequestDTO struct {
-	RefreshToken string
-}
-
 type RefreshHandler struct {
-	authService    service.AuthService
 	refreshService service.RefreshService
 	logger         *slog.Logger
 }
 
 func NewRefreshHandler(
-	authService service.AuthService,
 	refreshService service.RefreshService,
 	logger *slog.Logger,
 ) *RefreshHandler {
 	return &RefreshHandler{
-		authService:    authService,
 		refreshService: refreshService,
 		logger:         logger,
+	}
+}
+
+func (h *RefreshHandler) RegisterRoutes(r *gin.Engine) {
+	auth := r.Group("/auth")
+	{
+		auth.POST("/refresh", h.Refresh)
+		auth.POST("/logout", h.Logout)
 	}
 }
 

@@ -25,6 +25,13 @@ func NewUserHandler(
 	}
 }
 
+func (h *UserHandler) RegisterRoutes(r *gin.RouterGroup) {
+	r.GET("/id", h.GetUser)
+	r.PATCH("/id", h.UpdateUser)
+	r.GET("/", h.GetAllUsers)
+}
+
+
 func (h *UserHandler) GetUser(c *gin.Context) {
 	userID := c.MustGet("userID").(uint)
 
