@@ -28,6 +28,7 @@ func (h BookingHandler) RegisterRoutes(r *gin.Engine) {
 		booking.DELETE("/:id", h.DeleteBooking)
 		booking.GET("/", h.ListBooking)
 		booking.PATCH("/:id", h.Update)
+		booking.PATCH("/status/:id", h.UpdateStatus)
 	}
 }
 
@@ -39,16 +40,11 @@ func (h *BookingHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	id64, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		h.logger.Error("GetBooking invalid id format", "id", idStr, "error", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
+	id, _ := strconv.ParseUint(idStr, 10, 64)
 
-	booking, err := h.service.GetBookingById(uint(id64))
+	booking, err := h.service.GetBookingById(uint(id))
 	if err != nil {
-		h.logger.Error("GetBooking failed", "error", err, "id", id64)
+		h.logger.Error("GetBooking failed", "error", err, "id", id)
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
@@ -66,21 +62,16 @@ func (h *BookingHandler) DeleteBooking(c *gin.Context) {
 		return
 	}
 
-	id64, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		h.logger.Error("DeleteBooking invalid id format", "id", idStr, "error", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
+	id, _ := strconv.ParseUint(idStr, 10, 64)
 
-	if err := h.service.DeleteBooking(uint(id64)); err != nil {
-		h.logger.Error("DeleteBooking failed", "error", err, "id", id64)
+	if err := h.service.DeleteBooking(uint(id)); err != nil {
+		h.logger.Error("DeleteBooking failed", "error", err, "id", id)
 
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	h.logger.Info("DeleteBooking success", "booking_id", id64)
+	h.logger.Info("DeleteBooking success", "booking_id", id)
 
 	c.Status(http.StatusNoContent)
 }
@@ -94,7 +85,7 @@ func (h *BookingHandler) Create(c *gin.Context) {
 		return
 	}
 
-	booking, err := h.service.Create(req)
+	booking, err := h.service.Create(c.MustGet("UserID").(uint), req)
 	if err != nil {
 		h.logger.Error("CreateBooking failed", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -160,5 +151,29 @@ func (h *BookingHandler) Update(c *gin.Context) {
 	}
 
 	h.logger.Info("UpdateBooking success", "booking_id", id)
+	c.JSON(http.StatusOK, gin.H{"message": "updated"})
+}
+
+func (h *BookingHandler) UpdateStatus(c *gin.Context) {
+	idStr := c.Param("id")
+	if idStr == "" {
+		h.logger.Info("GetBooking invalid id param", "id", idStr)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param is required"})
+		return
+	}
+	id, _ := strconv.ParseUint(idStr, 10, 64)
+
+	var status models.BookingStatusDTO
+
+	if err := c.ShouldBindJSON(&status); err != nil {
+		h.logger.Error("UpdateBooking invalid body", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.service.UpdateStatus(uint(id), status); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{"message": "updated"})
 }

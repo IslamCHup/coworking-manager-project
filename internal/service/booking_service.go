@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"math"
+	"strings"
 	"time"
 
 	"github.com/IslamCHup/coworking-manager-project/internal/models"
@@ -11,11 +12,12 @@ import (
 )
 
 type BookingService interface {
-	Create(req models.BookingReqDTO) (*models.Booking, error)
+	Create(id uint, req models.BookingReqDTO) (*models.Booking, error)
 	GetBookingById(id uint) (*models.BookingResDTO, error)
 	DeleteBooking(id uint) error
 	ListBooking(filter *models.FilterBooking) (*[]models.Booking, error)
 	UpdateBooking(id uint, req *models.BookingReqUpdateDTO) error
+	UpdateStatus(id uint, status models.BookingStatusDTO) error 
 }
 
 type bookingService struct {
@@ -27,7 +29,7 @@ func NewBookingService(repo repository.BookingRepository, logger *slog.Logger) B
 	return &bookingService{repo: repo, logger: logger}
 }
 
-func (s *bookingService) Create(req models.BookingReqDTO) (*models.Booking, error) {
+func (s *bookingService) Create(id uint, req models.BookingReqDTO) (*models.Booking, error) {
 	start, err := time.Parse("2006-01-02 15", req.StartTime)
 	if err != nil {
 		return nil, errors.New("неправильный формат времени, нужен YYYY-MM-DD HH")
@@ -43,13 +45,6 @@ func (s *bookingService) Create(req models.BookingReqDTO) (*models.Booking, erro
 		return nil, errors.New("invalid booking time range: end must be after start")
 	}
 
-	if start.Minute() != 0 || start.Second() != 0 || start.Nanosecond() != 0 {
-		start = start.Add(time.Hour).Truncate(time.Hour)
-		end = start.Add(duration)
-	} else if end.Minute() != 0 || end.Second() != 0 || end.Nanosecond() != 0 {
-		end = start.Add(duration).Truncate(time.Hour)
-	}
-
 	if start.Weekday() == time.Saturday || start.Weekday() == time.Sunday {
 		return nil, errors.New("нельзя бронировать на выходной день")
 	}
@@ -59,7 +54,7 @@ func (s *bookingService) Create(req models.BookingReqDTO) (*models.Booking, erro
 	}
 
 	if start.Hour() < 9 || end.Hour() > 17 {
-		return nil, errors.New("мы работаем с 9 до 17 часов")
+		return nil, errors.New("мы работаем с 9 до 18 часов")
 	}
 
 	bookings, err := s.repo.ListBooking(nil)
@@ -78,14 +73,14 @@ func (s *bookingService) Create(req models.BookingReqDTO) (*models.Booking, erro
 			existingEnd := v.EndTime
 			newStart := start
 			newEnd := end
-			if existingStart.Before(newEnd) && existingEnd.After(newStart) {
+			if existingStart.Before(newEnd) && existingEnd.After(newStart) && v.Status == models.BookingActive {
 				return nil, errors.New("это время занято другими")
 			}
 		}
 	}
 
 	booking := &models.Booking{
-		UserID:    req.UserID,
+		UserID:    id,
 		PlaceID:   req.PlaceID,
 		StartTime: start,
 		EndTime:   end,
@@ -201,9 +196,6 @@ func (s *bookingService) UpdateBooking(id uint, req *models.BookingReqUpdateDTO)
 	if req.EndTime != nil {
 		booking.EndTime = end
 	}
-	if req.Status != nil {
-		booking.Status = *req.Status
-	}
 
 	if req.StartTime != nil || req.EndTime != nil {
 		durationHours := booking.EndTime.Sub(booking.StartTime).Hours()
@@ -223,7 +215,7 @@ func (s *bookingService) UpdateBooking(id uint, req *models.BookingReqUpdateDTO)
 				if v.ID == booking.ID || v.PlaceID != booking.PlaceID {
 					continue
 				}
-				if v.StartTime.Before(booking.EndTime) && v.EndTime.After(booking.StartTime) {
+				if v.StartTime.Before(booking.EndTime) && v.EndTime.After(booking.StartTime) && v.Status == models.BookingActive {
 					return errors.New("это время занято другими")
 				}
 			}
@@ -241,4 +233,29 @@ func (s *bookingService) UpdateBooking(id uint, req *models.BookingReqUpdateDTO)
 	}
 
 	return nil
+}
+
+func (s *bookingService) UpdateStatus(id uint, status models.BookingStatusDTO) error {
+	booking, err := s.repo.GetBookingById(id)
+	if err != nil {
+		return err
+	}
+
+	if status.Status == "" {
+		return errors.New("empty status")
+	}
+
+	statusClear := models.BookingStatus(strings.ToLower(strings.TrimSpace(string(status.Status))))
+	
+	booking.Status = statusClear
+	
+	switch statusClear {
+	case models.BookingActive, models.BookingNonActive, models.BookingCancelled:
+		if err := s.repo.UpdateBook(booking.ID, booking); err != nil{
+			return err
+		}
+		return nil
+	default:
+		return errors.New("invalid booking status")
+	}
 }
