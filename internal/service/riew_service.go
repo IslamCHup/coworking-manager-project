@@ -13,7 +13,7 @@ var ( ErrReviewNotFound = errors.New("error"))
 type ReviewService interface {
 	CreateReview(req *models.Review) (*models.Review, error)
 	GetReviewId(id uint) (*models.Review,error)
-	// UpdateReview(id uint, req models.Review) (*models.Review,error)
+	UpdateReview(id uint, req models.Review) (*models.Review,error)
 	// DeleteReview(id uint)error
 }
 type reviewService struct {
@@ -67,13 +67,14 @@ if err!=nil{
 }
 return review,nil
 }
-// func (s *reviewService) UpdateReview(id uint,req *models.UpdateReview) (*models.Review,error){
-// 	if err:= s.reviewValidate(req);err!=nil{
-// 		return nil,err
-// 	}
-// 	review:= models.Review{
-// 		Rating: req.Rating,
-// 		Text: req.Text,
-// 	}
-// 	if err:=s.
-// }
+func (s *reviewService) UpdateReview(id uint, v models.Review) (*models.Review,error) {
+	review,err:= s.review.GetReview(id)
+	if err!=nil{
+		return nil,err
+	}
+	if review ==nil{
+		return nil,errors.New("ничего не написано для обновления")
+	}
+	return review,nil
+	
+}
