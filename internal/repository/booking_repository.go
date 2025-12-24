@@ -12,7 +12,7 @@ import (
 type BookingRepository interface {
 	CreateBooking(req *models.Booking) error
 	ListBooking(filter *models.FilterBooking) (*[]models.Booking, error)
-	UpdateBooking(req *models.Booking) error
+	UpdateBook(id uint, req *models.Booking) error
 	Delete(id uint) error
 	GetBookingById(id uint) (*models.Booking, error)
 }
@@ -176,4 +176,18 @@ func (r *bookingRepository) ListBooking(filter *models.FilterBooking) (*[]models
 	}
 	r.logger.Info("ListBooking success", "count", len(*bookings), "limit", filter.Limit, "offset", filter.Offset)
 	return bookings, nil
+}
+
+func (r *bookingRepository) UpdateBook(id uint, req *models.Booking) error{
+	result := r.db.Model(models.Booking{}).Where("id = ?", id).Updates(req)
+	if result.Error != nil {
+		r.logger.Error("failed to update booking", "error", result.Error)
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		r.logger.Info("booking not found", "id", req.ID)
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }

@@ -121,14 +121,14 @@ func (h *AdminHandler) UpdateBooking(c *gin.Context) {
 		return
 	}
 
-	var req models.BookingUpdateDTO
+	var req models.BookingReqUpdateDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.logger.Warn("UpdateBooking invalid body", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := h.bookingService.UpdateBooking(uint(bookingID), req); err != nil {
+	if err := h.bookingService.UpdateBook(uint(bookingID), &req); err != nil {
 		h.logger.Error("UpdateBooking failed", "booking_id", bookingID, "error", err)
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "booking not found"})

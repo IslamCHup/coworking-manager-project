@@ -38,7 +38,6 @@ func (s *userService) GetUserByID(userID uint) (*models.UserResponseDTO, error) 
 
 	for _, b := range user.Bookings {
 		bookings = append(bookings, models.BookingResDTO{
-			ID:         b.ID,
 			UserID:     b.UserID,
 			PlaceID:    b.PlaceID,
 			StartTime:  b.StartTime,
