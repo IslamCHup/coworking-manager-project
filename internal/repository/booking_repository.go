@@ -58,6 +58,23 @@ func (r *bookingRepository) GetBookingById(id uint) (*models.Booking, error) {
 	return &booking, nil
 }
 
+func (r *bookingRepository) UpdateBooking(req *models.Booking) error {
+	if err := r.db.Save(req).Error; err != nil {
+		r.logger.Error(
+			"failed to update booking",
+			"booking_id", req.ID,
+			"error", err,
+		)
+		return err
+	}
+
+	r.logger.Info(
+		"booking updated",
+		"booking_id", req.ID,
+	)
+	return nil
+}
+
 func (r *bookingRepository) Delete(id uint) error {
 	r.logger.Debug("deleting booking", "id", id)
 

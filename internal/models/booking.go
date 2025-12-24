@@ -55,6 +55,14 @@ type BookingResDTO struct {
 	Place *Place           `json:"place,omitempty"`
 }
 
+type BookingUpdateDTO struct {
+	UserID    *uint          `json:"user_id"`
+	PlaceID   *uint          `json:"place_id"`
+	StartTime *time.Time     `json:"start_time"`
+	EndTime   *time.Time     `json:"end_time"`
+	Status    *BookingStatus `json:"status"`
+}
+
 type FilterBooking struct {
 	Status    *string    `form:"status" binding:"oneof=active cancelled non_active"`
 	PriceMin  *float64   `form:"price_min"`

@@ -17,8 +17,8 @@ type PhoneVerificationRepository interface {
 }
 
 type phoneVerificationRepository struct {
-	db     *gorm.DB					
-	logger *slog.Logger				
+	db     *gorm.DB
+	logger *slog.Logger
 }
 
 func NewPhoneVerificationRepository(
@@ -70,7 +70,6 @@ func (r *phoneVerificationRepository) Upsert(
 	return nil
 }
 
-	
 func (r *phoneVerificationRepository) GetByPhone(
 	phone string,
 ) (string, time.Time, int, error) {

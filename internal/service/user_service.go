@@ -7,13 +7,11 @@ import (
 	"github.com/IslamCHup/coworking-manager-project/internal/repository"
 )
 
-
-
-
 type UserService interface {
 	GetUserByID(userID uint) (*models.UserResponseDTO, error)
 	UpdateUser(userID uint, req models.UserUpdateDTO) error
 	DeleteUser(userID uint) error
+	GetAllUsers() ([]models.UserResponseDTO, error)
 }
 
 type userService struct {
@@ -33,21 +31,29 @@ func NewUserService(repo repository.UserRepository,
 func (s *userService) GetUserByID(userID uint) (*models.UserResponseDTO, error) {
 	user, err := s.repo.GetUserByID(userID)
 	if err != nil {
-		s.logger.Error(
-			"GetUserByID failed",
-			"user_id", userID,
-			"error", err,
-		)
 		return nil, err
 	}
 
-	s.logger.Info("GetUserByID success", "user_id", userID)
+	bookings := make([]models.BookingResDTO, 0, len(user.Bookings))
+
+	for _, b := range user.Bookings {
+		bookings = append(bookings, models.BookingResDTO{
+			ID:         b.ID,
+			UserID:     b.UserID,
+			PlaceID:    b.PlaceID,
+			StartTime:  b.StartTime,
+			EndTime:    b.EndTime,
+			TotalPrice: b.TotalPrice,
+			Status:     string(b.Status),
+		})
+	}
 
 	return &models.UserResponseDTO{
 		ID:        user.ID,
 		Phone:     user.Phone,
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
+		Bookings:  bookings,
 	}, nil
 }
 
@@ -95,4 +101,24 @@ func (s *userService) DeleteUser(userID uint) error {
 
 	s.logger.Info("DeleteUser success", "user_id", userID)
 	return nil
+}
+
+func (s *userService) GetAllUsers() ([]models.UserResponseDTO, error) {
+	users, err := s.repo.GetAllUsers()
+	if err != nil {
+		return nil, err
+	}
+
+	result := make([]models.UserResponseDTO, 0, len(users))
+
+	for _, u := range users {
+		result = append(result, models.UserResponseDTO{
+			ID:        u.ID,
+			Phone:     u.Phone,
+			FirstName: u.FirstName,
+			LastName:  u.LastName,
+		})
+	}
+
+	return result, nil
 }

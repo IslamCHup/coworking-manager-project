@@ -14,6 +14,7 @@ import (
 type BookingService interface {
 	Create(id uint, req models.BookingReqDTO) (*models.Booking, error)
 	GetBookingById(id uint) (*models.BookingResDTO, error)
+	UpdateBooking(id uint, req models.BookingUpdateDTO) error
 	DeleteBooking(id uint) error
 	ListBooking(filter *models.FilterBooking) (*[]models.Booking, error)
 	UpdateBooking(id uint, req *models.BookingReqUpdateDTO) error
@@ -21,12 +22,17 @@ type BookingService interface {
 }
 
 type bookingService struct {
-	repo   repository.BookingRepository
-	logger *slog.Logger
+	repo      repository.BookingRepository
+	placeRepo repository.PlaceRepository
+	logger    *slog.Logger
 }
 
-func NewBookingService(repo repository.BookingRepository, logger *slog.Logger) BookingService {
-	return &bookingService{repo: repo, logger: logger}
+func NewBookingService(repo repository.BookingRepository, placeRepo repository.PlaceRepository, logger *slog.Logger) BookingService {
+	return &bookingService{
+		repo:      repo,
+		placeRepo: placeRepo,
+		logger:    logger,
+	}
 }
 
 func (s *bookingService) Create(id uint, req models.BookingReqDTO) (*models.Booking, error) {
@@ -139,6 +145,89 @@ func (s *bookingService) GetBookingById(id uint) (*models.BookingResDTO, error) 
 	s.logger.Info("get booking by id completed")
 
 	return bookingResDTO, nil
+}
+
+func (s *bookingService) UpdateBooking(id uint, req models.BookingUpdateDTO) error {
+	booking, err := s.repo.GetBookingById(id)
+	if err != nil {
+		s.logger.Error(
+			"booking not found",
+			"booking_id", id,
+			"error", err,
+		)
+		return err
+	}
+
+	if req.UserID != nil {
+		booking.UserID = *req.UserID
+	}
+
+	// Если изменился PlaceID, загружаем новый Place
+	if req.PlaceID != nil {
+		booking.PlaceID = *req.PlaceID
+		// Загружаем новый Place для получения актуальной цены
+		newPlace, err := s.placeRepo.GetPlaceByID(*req.PlaceID)
+		if err != nil {
+			s.logger.Error(
+				"place not found",
+				"place_id", *req.PlaceID,
+				"error", err,
+			)
+			return errors.New("place not found")
+		}
+		booking.Place = newPlace
+	}
+
+	if req.StartTime != nil {
+		booking.StartTime = *req.StartTime
+	}
+
+	if req.EndTime != nil {
+		booking.EndTime = *req.EndTime
+	}
+
+	if req.Status != nil {
+		booking.Status = *req.Status
+	}
+
+	// Пересчитываем цену, если изменилось время или PlaceID
+	if req.StartTime != nil || req.EndTime != nil || req.PlaceID != nil {
+		durationHours := booking.EndTime.Sub(booking.StartTime).Hours()
+		if durationHours <= 0 {
+			return errors.New("invalid booking time range: end must be after start")
+		}
+
+		// Используем PricePerHour из Place
+		// Если Place не загружен (не менялся PlaceID), загружаем его
+		if booking.Place == nil {
+			place, err := s.placeRepo.GetPlaceByID(booking.PlaceID)
+			if err != nil {
+				s.logger.Error(
+					"place not found",
+					"place_id", booking.PlaceID,
+					"error", err,
+				)
+				return errors.New("place not found")
+			}
+			booking.Place = place
+		}
+
+		pricePerHour := booking.Place.PricePerHour
+		price := durationHours * pricePerHour
+		booking.TotalPrice = math.Round(price*100) / 100
+	}
+
+	if err := s.repo.UpdateBooking(booking); err != nil {
+		s.logger.Error(
+			"UpdateBooking failed",
+			"booking_id", id,
+			"error", err,
+		)
+		return err
+	}
+
+	s.logger.Info("UpdateBooking success", "booking_id", id)
+	return nil
 }
 
 func (s *bookingService) DeleteBooking(id uint) error {

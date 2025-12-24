@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/IslamCHup/coworking-manager-project/internal/models"
+	"github.com/IslamCHup/coworking-manager-project/internal/notification"
 	"github.com/IslamCHup/coworking-manager-project/internal/repository"
 	"gorm.io/gorm"
 )
@@ -25,6 +26,7 @@ type authService struct {
 	phoneRepo repository.PhoneVerificationRepository
 	userRepo  repository.UserRepository
 	logger    *slog.Logger
+	smsSender notification.SMSSender
 
 	codeTTL     time.Duration
 	maxAttempts int
@@ -33,13 +35,15 @@ type authService struct {
 func NewAuthService(phoneRepo repository.PhoneVerificationRepository,
 	userRepo repository.UserRepository,
 	logger *slog.Logger,
+	smsSender notification.SMSSender,
 ) AuthService {
 	return &authService{
 		phoneRepo:   phoneRepo,
 		userRepo:    userRepo,
+		smsSender:   smsSender,
 		logger:      logger,
-		codeTTL:     3 * time.Minute,
-		maxAttempts: 5,
+		codeTTL:     60 * time.Minute,
+		maxAttempts: 20,
 	}
 }
 
@@ -86,7 +90,18 @@ func (s *authService) RequestPhoneCode(phone string) error {
 		return err
 	}
 
-	s.logger.Info("sms code generated", "phone", phone, "code", code, "expires_at", expiresAt)
+	message := fmt.Sprintf("Ваш код подтверждения: %s", code)
+
+	if err := s.smsSender.Send(phone, message); err != nil {
+		s.logger.Error(
+			"failed to send sms",
+			"phone", phone,
+			"error", err,
+		)
+		return err
+	}
+
+	s.logger.Info("sms sent successfully", "phone", phone)
 
 	return nil
 }

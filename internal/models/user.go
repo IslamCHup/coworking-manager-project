@@ -7,9 +7,10 @@ type User struct {
 	FirstName string
 	LastName  string
 	IsBlocked bool `gorm:"default:false"`
+	Balance   int
 
-	Bookings []Booking `json:"-"`
-	Reviews  []Review  `json:"-"`
+	Bookings []Booking `gorm:"foreignKey:UserID"`
+	Reviews  []Review  `gorm:"foreignKey:UserID"`
 }
 
 type UserResponseDTO struct {
@@ -17,6 +18,8 @@ type UserResponseDTO struct {
 	Phone     string `json:"phone"`
 	FirstName string `json:"first_name"`
 	LastName  string `json:"last_name"`
+	Balance   int
+	Bookings  []BookingResDTO
 }
 
 type UserUpdateDTO struct {
