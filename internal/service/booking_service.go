@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"math"
+	"time"
 
 	"github.com/IslamCHup/coworking-manager-project/internal/models"
 	"github.com/IslamCHup/coworking-manager-project/internal/repository"
@@ -14,6 +15,7 @@ type BookingService interface {
 	GetBookingById(id uint) (*models.BookingResDTO, error)
 	DeleteBooking(id uint) error
 	ListBooking(filter *models.FilterBooking) (*[]models.Booking, error)
+	UpdateBooking(id uint, req *models.BookingReqUpdateDTO) error
 }
 
 type bookingService struct {
@@ -26,30 +28,74 @@ func NewBookingService(repo repository.BookingRepository, logger *slog.Logger) B
 }
 
 func (s *bookingService) Create(req models.BookingReqDTO) (*models.Booking, error) {
-	// надо исправить если другой прайс
-	priceHour := 100
-
-	booking := &models.Booking{
-		UserID:     req.UserID,
-		PlaceID:    req.PlaceID,
-		StartTime:  req.StartTime,
-		EndTime:    req.EndTime,
-		TotalPrice: req.TotalPrice,
-		Status:     req.Status,
+	start, err := time.Parse("2006-01-02 15", req.StartTime)
+	if err != nil {
+		return nil, errors.New("неправильный формат времени, нужен YYYY-MM-DD HH")
 	}
 
-	durationHours := booking.EndTime.Sub(booking.StartTime).Hours()
-	if durationHours <= 0 {
+	end, err := time.Parse("2006-01-02 15", req.EndTime)
+	if err != nil {
+		return nil, errors.New("неправильный формат времени, нужен YYYY-MM-DD HH")
+	}
+
+	duration := end.Sub(start)
+	if duration <= 0 {
 		return nil, errors.New("invalid booking time range: end must be after start")
 	}
 
-	price := durationHours * float64(priceHour)
+	if start.Minute() != 0 || start.Second() != 0 || start.Nanosecond() != 0 {
+		start = start.Add(time.Hour).Truncate(time.Hour)
+		end = start.Add(duration)
+	} else if end.Minute() != 0 || end.Second() != 0 || end.Nanosecond() != 0 {
+		end = start.Add(duration).Truncate(time.Hour)
+	}
+
+	if start.Weekday() == time.Saturday || start.Weekday() == time.Sunday {
+		return nil, errors.New("нельзя бронировать на выходной день")
+	}
+
+	if start.Before(time.Now()) {
+		return nil, errors.New("бронь просрочена")
+	}
+
+	if start.Hour() < 9 || end.Hour() > 17 {
+		return nil, errors.New("мы работаем с 9 до 17 часов")
+	}
+
+	bookings, err := s.repo.ListBooking(nil)
+	if err != nil {
+		if s.logger != nil {
+			s.logger.Error("failed to list bookings for overlap check", "error", err)
+		}
+		return nil, err
+	}
+	if bookings != nil {
+		for _, v := range *bookings {
+			if v.PlaceID != req.PlaceID {
+				continue
+			}
+			existingStart := v.StartTime
+			existingEnd := v.EndTime
+			newStart := start
+			newEnd := end
+			if existingStart.Before(newEnd) && existingEnd.After(newStart) {
+				return nil, errors.New("это время занято другими")
+			}
+		}
+	}
+
+	booking := &models.Booking{
+		UserID:    req.UserID,
+		PlaceID:   req.PlaceID,
+		StartTime: start,
+		EndTime:   end,
+		Status:    models.BookingNonActive,
+	}
+
+	durationHours := booking.EndTime.Sub(booking.StartTime).Hours()
+	price := durationHours * float64(models.PriceHour)
 
 	booking.TotalPrice = math.Round(price*100) / 100
-
-	if booking.Status == "" {
-		booking.Status = models.BookingActive
-	}
 
 	if err := s.repo.CreateBooking(booking); err != nil {
 		if s.logger != nil {
@@ -79,7 +125,6 @@ func (s *bookingService) GetBookingById(id uint) (*models.BookingResDTO, error) 
 	}
 
 	bookingResDTO := &models.BookingResDTO{
-		ID:         booking.ID,
 		UserID:     booking.UserID,
 		PlaceID:    booking.PlaceID,
 		StartTime:  booking.StartTime,
@@ -122,4 +167,78 @@ func (s *bookingService) ListBooking(filter *models.FilterBooking) (*[]models.Bo
 
 	s.logger.Info("ListBooking success")
 	return bookings, nil
+}
+
+func (s *bookingService) UpdateBooking(id uint, req *models.BookingReqUpdateDTO) error {
+	booking, err := s.repo.GetBookingById(id)
+	if err != nil {
+		if s.logger != nil {
+			s.logger.Error("failed to get booking for update", "id", id, "error", err)
+		}
+		return err
+	}
+
+	start, err := time.Parse("2006-01-02 15", *req.StartTime)
+
+	if err != nil {
+		return errors.New("неправильный формат времени, нужен YYYY-MM-DD HH")
+	}
+
+	end, err := time.Parse("2006-01-02 15", *req.EndTime)
+	if err != nil {
+		return errors.New("неправильный формат времени, нужен YYYY-MM-DD HH")
+	}
+
+	if req.UserID != nil {
+		booking.UserID = *req.UserID
+	}
+	if req.PlaceID != nil {
+		booking.PlaceID = *req.PlaceID
+	}
+	if req.StartTime != nil {
+		booking.StartTime = start
+	}
+	if req.EndTime != nil {
+		booking.EndTime = end
+	}
+	if req.Status != nil {
+		booking.Status = *req.Status
+	}
+
+	if req.StartTime != nil || req.EndTime != nil {
+		durationHours := booking.EndTime.Sub(booking.StartTime).Hours()
+		if durationHours <= 0 {
+			return errors.New("invalid booking time range: end must be after start")
+		}
+
+		bookings, err := s.repo.ListBooking(nil)
+		if err != nil {
+			if s.logger != nil {
+				s.logger.Error("failed to list bookings for overlap check", "error", err)
+			}
+			return err
+		}
+		if bookings != nil {
+			for _, v := range *bookings {
+				if v.ID == booking.ID || v.PlaceID != booking.PlaceID {
+					continue
+				}
+				if v.StartTime.Before(booking.EndTime) && v.EndTime.After(booking.StartTime) {
+					return errors.New("это время занято другими")
+				}
+			}
+		}
+
+		price := durationHours * float64(models.PriceHour)
+		booking.TotalPrice = math.Round(price*100) / 100
+	}
+
+	if err := s.repo.UpdateBook(id, booking); err != nil {
+		if s.logger != nil {
+			s.logger.Error("failed to update booking", "id", id, "error", err)
+		}
+		return err
+	}
+
+	return nil
 }

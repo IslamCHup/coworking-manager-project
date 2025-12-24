@@ -5,10 +5,12 @@ import "time"
 type BookingStatus string
 
 const (
+	BookingNonActive BookingStatus = "non_active"
 	BookingActive    BookingStatus = "active"
 	BookingCancelled BookingStatus = "cancelled"
-	BookingCompleted BookingStatus = "completed"
 )
+
+const PriceHour = 100
 
 type Booking struct {
 	Base
@@ -17,27 +19,28 @@ type Booking struct {
 	StartTime  time.Time     `json:"start_time" gorm:"not null;index" binding:"required"`
 	EndTime    time.Time     `json:"end_time" gorm:"not null;index" binding:"required,gtfield=StartTime"`
 	TotalPrice float64       `json:"total_price" gorm:"not null"`
-	Status     BookingStatus `json:"status" gorm:"not null;default:'active'"`
+	Status     BookingStatus `json:"status" gorm:"not null;default:'non_active'"`
 
 	User  *User  `json:"user,omitempty" gorm:"foreignKey:UserID"`
 	Place *Place `json:"place,omitempty" gorm:"foreignKey:PlaceID"`
 }
 
 type BookingReqDTO struct {
-	UserID    uint      `json:"user_id" binding:"required"`
-	PlaceID   uint      `json:"place_id" binding:"required"`
-	StartTime time.Time `json:"start_time" binding:"required"`
-	EndTime   time.Time `json:"end_time" binding:"required,gtfield=StartTime"`
+	UserID    uint   `json:"user_id"`
+	PlaceID   uint   `json:"place_id"`
+	StartTime string `json:"start_time"`
+	EndTime   string `json:"end_time"`
+}
 
-	TotalPrice float64       `json:"-" binding:"-"`
-	Status     BookingStatus `json:"status"`
-
-	User  *User  `json:"-" binding:"-"`
-	Place *Place `json:"-" binding:"-"`
+type BookingReqUpdateDTO struct {
+	UserID    *uint          `json:"user_id,omitempty"`
+	PlaceID   *uint          `json:"place_id,omitempty"`
+	StartTime *string        `json:"start_time,omitempty"`
+	EndTime   *string        `json:"end_time,omitempty"`
+	Status    *BookingStatus `json:"status,omitempty"`
 }
 
 type BookingResDTO struct {
-	ID         uint      `json:"id"`
 	UserID     uint      `json:"user_id"`
 	PlaceID    uint      `json:"place_id"`
 	StartTime  time.Time `json:"start_time"`
@@ -51,12 +54,12 @@ type BookingResDTO struct {
 
 type FilterBooking struct {
 	Status    *string    `form:"status"`
-	PriceMin  *float64  `form:"price_min"`
-	PriceMax  *float64  `form:"price_max"`
-	StartTime *time.Time `form:"start_time" time_format:"2006-01-02 15"`
-	EndTime   *time.Time `form:"end_time"   time_format:"2006-01-02 15"`
-	Limit     int       `form:"limit"`
-	Offset    int       `form:"offset"`
-	SortBy    string    `form:"sort_by"`
-	Order     string    `form:"order"`
+	PriceMin  *float64   `form:"price_min"`
+	PriceMax  *float64   `form:"price_max"`
+	StartTime *time.Time `form:"start_time"`
+	EndTime   *time.Time `form:"end_time"  `
+	Limit     int        `form:"limit"`
+	Offset    int        `form:"offset"`
+	SortBy    string     `form:"sort_by"`
+	Order     string     `form:"order"`
 }

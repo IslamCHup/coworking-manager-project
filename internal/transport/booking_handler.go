@@ -27,6 +27,7 @@ func (h BookingHandler) RegisterRoutes(r *gin.Engine) {
 		booking.GET("/:id", h.GetByID)
 		booking.DELETE("/:id", h.DeleteBooking)
 		booking.GET("/", h.ListBooking)
+		booking.PATCH("/:id", h.Update)
 	}
 }
 
@@ -52,7 +53,7 @@ func (h *BookingHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	h.logger.Info("GetBooking success", "booking_id", booking.ID)
+	h.logger.Info("GetBooking success")
 
 	c.JSON(http.StatusOK, booking)
 }
@@ -96,7 +97,7 @@ func (h *BookingHandler) Create(c *gin.Context) {
 	booking, err := h.service.Create(req)
 	if err != nil {
 		h.logger.Error("CreateBooking failed", "error", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -133,4 +134,31 @@ func (h *BookingHandler) ListBooking(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, booking)
+}
+
+func (h *BookingHandler) Update(c *gin.Context) {
+	idStr := c.Param("id")
+	if idStr == "" {
+		h.logger.Info("UpdateBooking invalid id param", "id", idStr)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id param is required"})
+		return
+	}
+
+	id, _ := strconv.ParseUint(idStr, 10, 64)
+
+	var req models.BookingReqUpdateDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Error("UpdateBooking invalid body", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err := h.service.UpdateBooking(uint(id), &req); err != nil {
+		h.logger.Error("UpdateBooking failed", "error", err, "id", id)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	h.logger.Info("UpdateBooking success", "booking_id", id)
+	c.JSON(http.StatusOK, gin.H{"message": "updated"})
 }
