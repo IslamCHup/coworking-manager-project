@@ -2,6 +2,8 @@
 .vscode/*
 cmd/seed
 tmp/*
-api
+/api
 main
 seed
+/cmd/api/tmp
+/tmp

@@ -9,10 +9,10 @@ import (
 	"github.com/IslamCHup/coworking-manager-project/internal/repository"
 	"gorm.io/gorm"
 )
-
+var ( ErrReviewNotFound = errors.New("error")) 
 type ReviewService interface {
 	CreateReview(req *models.Review) (*models.Review, error)
-	// GetReviewId(id uint) (*models.Review,error)
+	GetReviewId(id uint) (*models.Review,error)
 	// UpdateReview(id uint, req models.Review) (*models.Review,error)
 	// DeleteReview(id uint)error
 }
@@ -57,3 +57,23 @@ func (s *reviewService) CreateReview(req *models.Review) (*models.Review, error)
 	return review, nil
 
 }
+func (s*reviewService) GetReviewId(id uint) (*models.Review,error){
+review,err:=  s.review.GetReview(id)
+if err!=nil{
+	if errors.Is(err,gorm.ErrRecordNotFound){
+		return nil, err
+	}
+	return nil,ErrReviewNotFound
+}
+return review,nil
+}
+// func (s *reviewService) UpdateReview(id uint,req *models.UpdateReview) (*models.Review,error){
+// 	if err:= s.reviewValidate(req);err!=nil{
+// 		return nil,err
+// 	}
+// 	review:= models.Review{
+// 		Rating: req.Rating,
+// 		Text: req.Text,
+// 	}
+// 	if err:=s.
+// }

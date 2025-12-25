@@ -8,10 +8,11 @@ import (
 )
 
 type ReviewRepository interface {
-	CreateReview(req *models.Review) error
-	// UpdateReview(req *models.Review) error
+	CreateReview(req *models.Review) error	
+	GetReview(id uint) (*models.Review, error)
+	UpdateReview(req *models.Review) error
 	// DeleteReview(id uint) error
-	// GetReview(id uint) (*models.Review, error)
+
 }
 
 var ErrReviewNil = errors.New("review nil")
@@ -42,4 +43,15 @@ func (r *reviewRepository) CreateReview(review *models.Review) error {
 		return err
 	}
 	return nil
+}
+func (r *reviewRepository)GetReview(id uint) (*models.Review,error){
+var review *models.Review
+if err:= r.db.First(&review,id).Error;err!=nil{}
+return review,nil
+}
+func (r *reviewRepository) UpdateReview(review *models.Review)error{
+	if review == nil{
+	return nil
+	}
+	return r.db.Save(review).Error
 }

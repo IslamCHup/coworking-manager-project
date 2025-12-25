@@ -26,5 +26,4 @@ type PlaceRequestRatingId struct {
 type UpdateReview struct{
 	Rating int
 	Text string
-	updateTime time.Time
 }

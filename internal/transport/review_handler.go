@@ -3,6 +3,7 @@ package transport
 import (
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/IslamCHup/coworking-manager-project/internal/models"
 	"github.com/IslamCHup/coworking-manager-project/internal/service"
@@ -21,7 +22,7 @@ func (h ReviewHandler) RegisterRoutesReview(r *gin.Engine) {
 	review := r.Group("/review")
 	{
 		review.POST("/", h.CreateReview)
-		// booking.GET("/:id", h.GetByID)
+		 review.GET("/:id", h.GetByID) 
 		// booking.DELETE("/:id", h.DeleteBooking)
 	}
 }
@@ -72,4 +73,16 @@ func (h *ReviewHandler) CreateReview(c *gin.Context) {
 		"message": "отзыв успешно создан",
 		"review":  createdReview,
 	})
+}
+func(h *ReviewHandler) GetByID(c*gin.Context) {
+	id ,err:=strconv.ParseUint(c.Param("id"),10,32)
+	if err!=nil{
+		c.JSON(http.StatusBadRequest,gin.H{"error":"invalid id"})
+		return
+	}
+review,err:=h.review.GetReviewId(uint(id))
+if err!= nil{
+	return
+}
+c.JSON(http.StatusOK,review)
 }
