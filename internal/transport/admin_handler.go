@@ -37,8 +37,10 @@ func (h *AdminHandler) RegisterRoutes(r *gin.Engine, adminService service.AdminS
 
 	admin.GET("/login", h.Login)
 
+	admin.GET("/users", h.GetAllUsers)
 	admin.PUT("/users/:id", h.UpdateUser)
 	admin.DELETE("/users/:id", h.DeleteUser)
+	admin.PATCH("/users/:id/balance", h.UpdateUserBalance)
 
 	admin.PUT("/bookings/:id", h.UpdateBooking)
 	admin.DELETE("/bookings/:id", h.DeleteBooking)
@@ -58,6 +60,16 @@ func (h *AdminHandler) Login(c *gin.Context) {
 		"id":    adminID,
 		"login": adminLogin,
 	})
+}
+
+func (h *AdminHandler) GetAllUsers(c *gin.Context) {
+    users, err := h.userService.GetAllUsers()
+    if err != nil {
+        h.logger.Error("Admin GetAllUsers failed", "error", err)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось получить пользователей"})
+        return
+    }
+    c.JSON(http.StatusOK, users)
 }
 
 func (h *AdminHandler) UpdateUser(c *gin.Context) {
@@ -244,4 +256,35 @@ func (h *AdminHandler) AdminUpdateBookingStatus(c *gin.Context) {
 
 	h.logger.Info("AdminUpdateBookingStatus success", "booking_id", bookingID, "status", bookingStatus)
 	c.JSON(http.StatusOK, gin.H{"message": "статус бронирования успешно обновлен"})
+}
+
+func (h *AdminHandler) UpdateUserBalance(c *gin.Context) {
+    idParam := c.Param("id")
+    userID64, err := strconv.ParseUint(idParam, 10, 32)
+    if err != nil {
+        h.logger.Warn("invalid user id", "id", idParam, "error", err)
+        c.JSON(http.StatusBadRequest, gin.H{"error": "неверный ID пользователя"})
+        return
+    }
+
+    var req models.UpdateBalanceDTO
+    if err := c.ShouldBindJSON(&req); err != nil {
+        h.logger.Warn("UpdateUserBalance invalid body", "error", err)
+        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+        return
+    }
+
+
+    if req.Amount == 0 {
+        c.JSON(http.StatusBadRequest, gin.H{"error": "amount не может быть 0"})
+        return
+    }
+
+    if err := h.userService.UpdateUserBalance(uint(userID64), req.Amount); err != nil {
+        h.logger.Error("UpdateUserBalance failed", "user_id", userID64, "amount", req.Amount, "error", err)
+        c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось изменить баланс"})
+        return
+    }
+
+    c.JSON(http.StatusOK, gin.H{"message": "баланс обновлен"})
 }
