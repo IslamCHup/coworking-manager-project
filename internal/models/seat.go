@@ -22,3 +22,15 @@ type Place struct {
 	Bookings []Booking `json:"-"`
 	Reviews  []Review  `json:"-"`
 }
+
+// FilterPlace используется для листинга мест и поиска свободных мест
+type FilterPlace struct {
+	Type      *string    `form:"type" binding:"omitempty,oneof=workspace meeting_room"`
+	IsActive  *bool      `form:"is_active"`
+	StartTime *time.Time `form:"start_time"`
+	EndTime   *time.Time `form:"end_time"`
+	Limit     int        `form:"limit"`
+	Offset    int        `form:"offset"`
+	SortBy    string     `form:"sort_by"`
+	Order     string     `form:"order"`
+}
