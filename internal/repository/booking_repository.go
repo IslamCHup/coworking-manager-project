@@ -120,8 +120,6 @@ func (r *bookingRepository) ListBooking(filter *models.FilterBooking) (*[]models
 
 	var bookings *[]models.Booking
 
-	r.logger.Debug("")
-
 	query := r.db.Model(models.Booking{}).Preload("User").Preload("Place")
 
 	if filter.Status != nil {
@@ -178,7 +176,7 @@ func (r *bookingRepository) ListBooking(filter *models.FilterBooking) (*[]models
 	return bookings, nil
 }
 
-func (r *bookingRepository) UpdateBook(id uint, req *models.Booking) error{
+func (r *bookingRepository) UpdateBook(id uint, req *models.Booking) error {
 	result := r.db.Model(models.Booking{}).Where("id = ?", id).Updates(req)
 	if result.Error != nil {
 		r.logger.Error("failed to update booking", "error", result.Error)

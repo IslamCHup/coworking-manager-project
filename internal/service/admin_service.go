@@ -32,7 +32,7 @@ func (s *adminService) VerifyAdmin(login, password string) (*models.Admin, error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			s.logger.Warn("Admin not found", "login", login)
-			return nil, errors.New("invalid credentials")
+			return nil, errors.New("неверные учетные данные")
 		}
 		s.logger.Error("GetAdminByLogin failed", "login", login, "error", err)
 		return nil, err

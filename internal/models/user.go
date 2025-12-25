@@ -26,3 +26,7 @@ type UserUpdateDTO struct {
 	FirstName *string `json:"first_name"`
 	LastName  *string `json:"last_name"`
 }
+
+type UpdateBalanceDTO struct {
+    Amount int `json:"amount" binding:"required"`
+}

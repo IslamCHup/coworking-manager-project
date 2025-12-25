@@ -14,6 +14,7 @@ type UserRepository interface {
 	UpdateUser(req *models.User) error
 	DeleteUser(id uint) error
 	GetAllUsers() ([]models.User, error)
+	UpdateUserBalance(userID uint, amount int) error
 }
 
 type userRepository struct {
@@ -110,4 +111,18 @@ func (r *userRepository) GetAllUsers() ([]models.User, error) {
 
 	r.logger.Info("GetAllUsers success", "count", len(users))
 	return users, nil
+}
+
+func (r *userRepository) UpdateUserBalance(userID uint, amount int) error {
+	result := r.db.Model(&models.User{}).Where("id = ?", userID).Update("balance", gorm.Expr("balance + ?", amount))
+	if result.Error != nil {
+		r.logger.Error("UpdateUserBalance failed", "user_id", userID, "amount", amount, "error", result.Error)
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		r.logger.Warn("UpdateUserBalance: user not found", "user_id", userID)
+		return gorm.ErrRecordNotFound
+	}
+	r.logger.Info("UpdateUserBalance success", "user_id", userID, "amount", amount)
+	return nil
 }
