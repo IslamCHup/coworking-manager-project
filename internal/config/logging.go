@@ -30,7 +30,7 @@ func InitLogger() *slog.Logger {
 	levelLog := ParseLog(logLevelENV)
 	handlersLogger := slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: levelLog,
-		// AddSource: true,
+	
 	})
 
 	logger := slog.New(handlersLogger)

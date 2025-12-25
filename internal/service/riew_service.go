@@ -13,7 +13,7 @@ type ReviewService interface {
 	CreateReview(req *models.Review) (*models.Review, error)
 	GetReviewId(id uint) (*models.Review, error)
 	UpdateReview(id uint, req models.UpdateReviewDTO) (*models.Review, error)
-	// DeleteReview(id uint)error
+	DeleteReview(id uint)error
 }
 type reviewService struct {
 	db     *gorm.DB
@@ -95,4 +95,21 @@ func (s *reviewService) UpdateReview(id uint, req models.UpdateReviewDTO) (*mode
 	}
 
 	return review, nil
+}
+
+func (s *reviewService) DeleteReview(id uint) error {
+	_, err := s.review.GetReview(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return ErrReviewNotFound
+		}
+		return err
+	}
+
+	err = s.review.DeleteReview(id)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

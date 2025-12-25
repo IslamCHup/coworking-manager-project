@@ -12,7 +12,7 @@ type ReviewRepository interface {
 	CreateReview(req *models.Review) error	
 	GetReview(id uint) (*models.Review, error)
 	UpdateReview(req *models.Review) error
-	// DeleteReview(id uint) error
+	 DeleteReview(id uint) error
 
 }
 
@@ -58,4 +58,14 @@ func (r *reviewRepository) GetReview(id uint) (*models.Review, error) {
 }
 func (r *reviewRepository) UpdateReview(review *models.Review) error {
 	return r.db.Save(review).Error
+}
+func (r *reviewRepository) DeleteReview(id uint) error {
+	result := r.db.Delete(&models.Review{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return nil
 }

@@ -24,7 +24,8 @@ func (h *ReviewHandler) RegisterRoutesReview(r *gin.Engine) {
 	{
 		review.POST("/", h.CreateReview)
 		review.GET("/:id", h.GetByID)
-		 review.PUT("/:id", h.UpdateReview)
+		review.PUT("/:id", h.UpdateReview)
+		review.DELETE("/:id", h.DeleteReview)
 	}
 }
 
@@ -147,5 +148,54 @@ func (h *ReviewHandler) UpdateReview(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "отзыв успешно обновлен",
 		"review":  updatedReview,
+	})
+}
+
+func (h *ReviewHandler) DeleteReview(c *gin.Context) {
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "пользователь не авторизован",
+		})
+		return
+	}
+
+	userIDUint, ok := userID.(uint)
+	if !ok || userIDUint == 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "неверный идентификатор пользователя",
+		})
+		return
+	}
+
+	id, err := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		return
+	}
+
+	review, err := h.review.GetReviewId(uint(id))
+	if err != nil {
+		h.logger.Error("failed to get review", "id", id, "error", err)
+		c.JSON(http.StatusNotFound, gin.H{"error": "отзыв не найден"})
+		return
+	}
+
+	if review.UserID != userIDUint {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "нет доступа к этому отзыву",
+		})
+		return
+	}
+
+	err = h.review.DeleteReview(uint(id))
+	if err != nil {
+		h.logger.Error("failed to delete review", "id", id, "user_id", userIDUint, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось удалить отзыв"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "отзыв успешно удален",
 	})
 }
