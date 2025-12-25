@@ -33,14 +33,7 @@ func (h BookingHandler) RegisterRoutes(r *gin.Engine) {
 }
 
 func (h *BookingHandler) GetByID(c *gin.Context) {
-	idStr := c.Param("id")
-	if idStr == "" {
-		h.logger.Info("GetBooking invalid id param", "id", idStr)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id param is required"})
-		return
-	}
-
-	id, _ := strconv.ParseUint(idStr, 10, 64)
+	id := c.MustGet("userID").(uint)
 
 	booking, err := h.service.GetBookingById(uint(id))
 	if err != nil {
@@ -55,14 +48,7 @@ func (h *BookingHandler) GetByID(c *gin.Context) {
 }
 
 func (h *BookingHandler) DeleteBooking(c *gin.Context) {
-	idStr := c.Param("id")
-	if idStr == "" {
-		h.logger.Info("DeleteBooking invalid id param", "id", idStr)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id param is required"})
-		return
-	}
-
-	id, _ := strconv.ParseUint(idStr, 10, 64)
+	id := c.MustGet("userID").(uint)
 
 	if err := h.service.DeleteBooking(uint(id)); err != nil {
 		h.logger.Error("DeleteBooking failed", "error", err, "id", id)
@@ -128,14 +114,8 @@ func (h *BookingHandler) ListBooking(c *gin.Context) {
 }
 
 func (h *BookingHandler) Update(c *gin.Context) {
-	idStr := c.Param("id")
-	if idStr == "" {
-		h.logger.Info("UpdateBooking invalid id param", "id", idStr)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id param is required"})
-		return
-	}
+	id := c.MustGet("userID").(uint)
 
-	id, _ := strconv.ParseUint(idStr, 10, 64)
 
 	var req models.BookingReqUpdateDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
