@@ -69,6 +69,7 @@ func main() {
 
 	// Инициализация сервисов
 	bookingService := service.NewBookingService(bookingRepo, placeRepo, db, logger)
+	placeService := service.NewPlaceService(placeRepo, db)
 	adminService := service.NewAdminService(adminRepo, logger)
 	userService := service.NewUserService(userRepo, logger)
 	authService := service.NewAuthService(phoneRepo, userRepo, logger, smsSender)
@@ -77,7 +78,7 @@ func main() {
 
 	r := gin.Default()
 
-	transport.RegisterRoutes(r, logger, bookingService, adminService, userService, authService, refreshService, reviewService)
+	transport.RegisterRoutes(r, logger, bookingService, placeService, adminService, userService, authService, refreshService, reviewService)
 
 	logger.Info("Запуск HTTP-сервера", "port", os.Getenv("PORT"))
 	if err := r.Run(":" + os.Getenv("PORT")); err != nil {

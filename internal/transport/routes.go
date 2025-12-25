@@ -12,6 +12,7 @@ func RegisterRoutes(
 	router *gin.Engine,
 	logger *slog.Logger,
 	bookingService service.BookingService,
+	placeService service.PlaceService,
 	adminService service.AdminService,
 	userService service.UserService,
 	authService service.AuthService,
@@ -20,6 +21,10 @@ func RegisterRoutes(
 ) {
 	bookingHandler := NewBookingHandler(bookingService, logger)
 	bookingHandler.RegisterRoutes(router)
+
+	placeHandler := NewPlaceHandler(placeService, logger)
+	placeHandler.RegisterRoutes(router)
+
 	authHandler := NewAuthHandler(authService, logger, refreshService)
 	authHandler.RegisterRoutes(router)
 	refreshHandler := NewRefreshHandler(refreshService, logger)
