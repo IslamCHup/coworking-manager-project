@@ -120,22 +120,14 @@ func (r *phoneVerificationRepository) IncrementAttempts(phone string) error {
 }
 
 func (r *phoneVerificationRepository) DeleteByPhone(phone string) error {
-	err := r.db.
+	err := r.db.Unscoped().
 		Where("phone = ?", phone).
 		Delete(&models.PhoneVerification{}).Error
-
 	if err != nil {
-		r.logger.Error(
-			"DeletePhoneVerification failed",
-			"phone", phone,
-			"error", err,
-		)
+		r.logger.Error("DeletePhoneVerification failed", "phone", phone, "error", err)
 		return err
 	}
 
-	r.logger.Info(
-		"PhoneVerification deleted",
-		"phone", phone,
-	)
+	r.logger.Info("PhoneVerification deleted", "phone", phone)
 	return nil
 }

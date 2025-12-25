@@ -55,31 +55,30 @@ func (r *refreshTokenRepository) GetByHash(hash string) (*models.RefreshToken, e
 }
 
 func (r *refreshTokenRepository) DeleteByHash(hash string) error {
-	if err := r.db.Where("token_hash = ?", hash).
-		Delete(&models.RefreshToken{}).Error; err != nil {
-		r.logger.Error(
-			"delete refresh token by hash failed",
-			"hash", hash,
-			"error", err,
-		)
+	err := r.db.Unscoped().
+		Where("token_hash = ?", hash).
+		Delete(&models.RefreshToken{}).Error
+	if err != nil {
+		r.logger.Error("delete refresh token by hash failed", "hash", hash, "error", err)
 		return err
 	}
 
-	r.logger.Info("refresh token deleted by hash")
+	r.logger.Info("refresh token deleted by hash", "hash", hash)
 	return nil
 }
 
 func (r *refreshTokenRepository) DeleteByUserID(userID uint) error {
-	if err := r.db.Where("user_id = ?", userID).
-		Delete(&models.RefreshToken{}).Error; err != nil {
-		r.logger.Error(
-			"delete refresh token by user failed",
-			"user_id", userID,
-			"error", err,
-		)
+	err := r.db.Unscoped().
+		Where("user_id = ?", userID).
+		Delete(&models.RefreshToken{}).Error
+	if err != nil {
+		r.logger.Error("delete refresh token by user failed", "user_id", userID, "error", err)
 		return err
 	}
 
 	r.logger.Info("refresh token deleted by user", "user_id", userID)
 	return nil
 }
+
+
+
