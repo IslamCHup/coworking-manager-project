@@ -28,7 +28,7 @@ func NewUserHandler(
 func (h *UserHandler) RegisterRoutes(r *gin.RouterGroup) {
 	r.GET("/id", h.GetUser)
 	r.PATCH("/id", h.UpdateUser)
-	r.GET("/", h.GetAllUsers)
+	//r.GET("/", h.GetAllUsers) по факту админ должен, дефолт юзеру это незачем
 }
 
 
