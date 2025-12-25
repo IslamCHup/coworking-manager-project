@@ -3,8 +3,6 @@ package transport
 import (
 	"log/slog"
 	"net/http"
-	"strconv"
-
 	"github.com/gin-gonic/gin"
 
 	"github.com/IslamCHup/coworking-manager-project/internal/models"
@@ -20,17 +18,13 @@ func NewBookingHandler(service service.BookingService, logger *slog.Logger) *Boo
 	return &BookingHandler{service: service, logger: logger}
 }
 
-func (h BookingHandler) RegisterRoutes(r *gin.Engine) {
-	booking := r.Group("/booking")
-	{
-		booking.POST("/", h.Create)
-		booking.GET("/:id", h.GetByID)
-		booking.DELETE("/:id", h.DeleteBooking)
-		booking.GET("/", h.ListBooking)
-		booking.PATCH("/:id", h.Update)
-		booking.PATCH("/status/:id", h.UpdateStatus)
+func (h BookingHandler) RegisterRoutes(r *gin.RouterGroup) {
+		r.POST("/", h.Create)
+		r.GET("/:id", h.GetByID)
+		r.DELETE("/:id", h.DeleteBooking)
+		r.PATCH("/:id", h.Update)
 	}
-}
+
 
 func (h *BookingHandler) GetByID(c *gin.Context) {
 	id := c.MustGet("userID").(uint)
@@ -83,36 +77,6 @@ func (h *BookingHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, booking)
 }
 
-func (h *BookingHandler) ListBooking(c *gin.Context) {
-	var q models.FilterBooking
-
-	if err := c.ShouldBindQuery(&q); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	filter := models.FilterBooking{
-		Status:    q.Status,
-		PriceMin:  q.PriceMin,
-		PriceMax:  q.PriceMax,
-		StartTime: q.StartTime,
-		EndTime:   q.EndTime,
-		Limit:     q.Limit,
-		Offset:    q.Offset,
-		SortBy:    q.SortBy,
-		Order:     q.Order,
-	}
-
-	booking, err := h.service.ListBooking(&filter)
-
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusOK, booking)
-}
-
 func (h *BookingHandler) Update(c *gin.Context) {
 	id := c.MustGet("userID").(uint)
 
@@ -134,26 +98,3 @@ func (h *BookingHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "обновлено"})
 }
 
-func (h *BookingHandler) UpdateStatus(c *gin.Context) {
-	idStr := c.Param("id")
-	if idStr == "" {
-		h.logger.Info("GetBooking invalid id param", "id", idStr)
-		c.JSON(http.StatusBadRequest, gin.H{"error": "параметр id обязателен"})
-		return
-	}
-	id, _ := strconv.ParseUint(idStr, 10, 64)
-
-	var status models.BookingStatusDTO
-
-	if err := c.ShouldBindJSON(&status); err != nil {
-		h.logger.Error("UpdateBooking invalid body", "error", err)
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	if err := h.service.UpdateStatus(uint(id), status); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"message": "обновлено"})
-}

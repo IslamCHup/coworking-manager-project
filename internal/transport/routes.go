@@ -18,7 +18,6 @@ func RegisterRoutes(
 	refreshService service.RefreshService,
 ) {
 	bookingHandler := NewBookingHandler(bookingService, logger)
-	bookingHandler.RegisterRoutes(router)
 	authHandler := NewAuthHandler(authService, logger, refreshService)
 	authHandler.RegisterRoutes(router)
 	refreshHandler := NewRefreshHandler(refreshService, logger)
@@ -33,4 +32,7 @@ func RegisterRoutes(
 
 	users := protected.Group("/users")
 	userHandler.RegisterRoutes(users)
+
+	bookings := protected.Group("/bookings")
+	bookingHandler.RegisterRoutes(bookings)
 }

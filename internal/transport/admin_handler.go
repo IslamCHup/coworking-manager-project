@@ -44,6 +44,7 @@ func (h *AdminHandler) RegisterRoutes(r *gin.Engine, adminService service.AdminS
 
 	admin.PUT("/bookings/:id", h.UpdateBooking)
 	admin.DELETE("/bookings/:id", h.DeleteBooking)
+	admin.GET("/bookings",h.ListBooking)
 
 	admin.PUT("/status/booking/:id", h.AdminUpdateBookingStatus)
 }
@@ -287,4 +288,35 @@ func (h *AdminHandler) UpdateUserBalance(c *gin.Context) {
     }
 
     c.JSON(http.StatusOK, gin.H{"message": "баланс обновлен"})
+}
+
+
+func (h *AdminHandler) ListBooking(c *gin.Context) {
+	var q models.FilterBooking
+
+	if err := c.ShouldBindQuery(&q); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	filter := models.FilterBooking{
+		Status:    q.Status,
+		PriceMin:  q.PriceMin,
+		PriceMax:  q.PriceMax,
+		StartTime: q.StartTime,
+		EndTime:   q.EndTime,
+		Limit:     q.Limit,
+		Offset:    q.Offset,
+		SortBy:    q.SortBy,
+		Order:     q.Order,
+	}
+
+	booking, err := h.bookingService.ListBooking(&filter)
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, booking)
 }
