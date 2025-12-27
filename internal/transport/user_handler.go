@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/IslamCHup/coworking-manager-project/internal/middleware"
 	"github.com/IslamCHup/coworking-manager-project/internal/models"
 	"github.com/IslamCHup/coworking-manager-project/internal/service"
 )
@@ -26,14 +27,16 @@ func NewUserHandler(
 }
 
 func (h *UserHandler) RegisterRoutes(r *gin.RouterGroup) {
-	r.GET("/id", h.GetUser)
-	r.PATCH("/id", h.UpdateUser)
-	//r.GET("/", h.GetAllUsers) по факту админ должен, дефолт юзеру это незачем
+	protected := r.Group("/")
+	protected.Use(middleware.RequireAuthMiddleware())
+
+	protected.GET("/me", h.GetUser)
+	protected.PATCH("/me", h.UpdateUser)
+	// r.GET("/", h.GetAllUsers) // только для admin
 }
 
-
 func (h *UserHandler) GetUser(c *gin.Context) {
-	userID := c.MustGet("userID").(uint)
+	userID := c.MustGet("user_id").(uint)
 
 	user, err := h.service.GetUserByID(userID)
 	if err != nil {
@@ -47,7 +50,7 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 }
 
 func (h *UserHandler) UpdateUser(c *gin.Context) {
-	userID := c.MustGet("userID").(uint)
+	userID := c.MustGet("user_id").(uint)
 
 	var req models.UserUpdateDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -64,27 +67,4 @@ func (h *UserHandler) UpdateUser(c *gin.Context) {
 
 	h.logger.Info("UpdateUser success", "user_id", userID)
 	c.JSON(http.StatusOK, gin.H{"message": "пользователь обновлен"})
-}
-
-func (h *UserHandler) GetAllUsers(c *gin.Context) {
-	h.logger.Info("GetAllUsers request received")
-
-	users, err := h.service.GetAllUsers()
-	if err != nil {
-		h.logger.Error(
-			"GetAllUsers request failed",
-			"error", err,
-		)
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "не удалось получить пользователей",
-		})
-		return
-	}
-
-	h.logger.Info(
-		"GetAllUsers request success",
-		"count", len(users),
-	)
-
-	c.JSON(http.StatusOK, users)
 }

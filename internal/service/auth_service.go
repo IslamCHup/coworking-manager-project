@@ -1,190 +1,168 @@
 package service
 
 import (
-	"crypto/rand"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
-	"math/big"
 	"strings"
-	"time"
 
 	"github.com/IslamCHup/coworking-manager-project/internal/models"
-	"github.com/IslamCHup/coworking-manager-project/internal/notification"
 	"github.com/IslamCHup/coworking-manager-project/internal/repository"
-	"gorm.io/gorm"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthService interface {
-	RequestPhoneCode(phone string) error
-	VerifyPhoneCode(phone string, code string) (userID uint, err error)
+	Register(
+		firstName string,
+		lastName string,
+		email string,
+		password string,
+	) (*models.User, error)
+
+	Login(email string, password string) (*models.User, error)
 }
 
 type authService struct {
-	phoneRepo repository.PhoneVerificationRepository
-	userRepo  repository.UserRepository
-	logger    *slog.Logger
-	smsSender notification.SMSSender
-
-	codeTTL     time.Duration
-	maxAttempts int
+	authRepo repository.AuthRepository
+	logger   *slog.Logger
 }
 
-func NewAuthService(phoneRepo repository.PhoneVerificationRepository,
-	userRepo repository.UserRepository,
+func NewAuthService(
+	authRepo repository.AuthRepository,
 	logger *slog.Logger,
-	smsSender notification.SMSSender,
 ) AuthService {
 	return &authService{
-		phoneRepo:   phoneRepo,
-		userRepo:    userRepo,
-		smsSender:   smsSender,
-		logger:      logger,
-		codeTTL:     60 * time.Minute,
-		maxAttempts: 20,
+		authRepo: authRepo,
+		logger:   logger,
 	}
 }
 
-func normalizePhone(phone string) string {
-	return strings.TrimSpace(phone)
+
+func hashPassword(password string) (string, error) {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(bytes), err
 }
 
-func generate6Digits() (string, error) {
-	n, err := rand.Int(rand.Reader, big.NewInt(1000000))
+func checkPassword(hash, password string) error {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+}
+
+
+func (s *authService) Register(
+	firstName string,
+	lastName string,
+	email string,
+	password string,
+) (*models.User, error) {
+
+	firstName = strings.TrimSpace(firstName)
+	lastName = strings.TrimSpace(lastName)
+	email = strings.TrimSpace(strings.ToLower(email))
+	password = strings.TrimSpace(password)
+
+	if email == "" || password == "" {
+		return nil, fmt.Errorf("email: %s или пароль пустые", email)
+	}
+
+	if len(password) < 8 {
+		return nil, errors.New("пароль должен быть не короче 8 символов")
+	}
+
+	passwordHash, err := hashPassword(password)
 	if err != nil {
-		return "", err
-	}
-	return fmt.Sprintf("%06d", n.Int64()), nil
-}
-
-func hashCode(code string) string {
-	sum := sha256.Sum256([]byte(code))
-	return hex.EncodeToString(sum[:])
-}
-
-func compareCodeHash(storedHash, code string) bool {
-	return storedHash == hashCode(code)
-}
-
-func (s *authService) RequestPhoneCode(phone string) error {
-	phone = normalizePhone(phone)
-
-	if phone == "" {
-		return errors.New("телефон не может быть пустым")
+		s.logger.Error("hash password failed", "error", err)
+		return nil, err
 	}
 
-	code, err := generate6Digits()
+	user := &models.User{
+		FirstName:    firstName,
+		LastName:     lastName,
+		Email:        email,
+		PasswordHash: passwordHash,
+		IsBlocked:    false,
+		Balance:      0,
+	}
 
+	if err := s.authRepo.CreateUser(user); err != nil {
+		s.logger.Error("register failed", "email", email, "error", err)
+		return nil, err
+	}
+
+	s.logger.Info(
+		"user registered",
+		"user_id", user.ID,
+		"email", email,
+	)
+
+	return user, nil
+}
+
+func (s *authService) Login(email string, password string) (*models.User, error) {
+	email = strings.TrimSpace(strings.ToLower(email))
+	password = strings.TrimSpace(password)
+
+	if email == "" || password == "" {
+		return nil, errors.New("email или пароль пустые")
+	}
+
+	user, err := s.authRepo.GetUserByEmail(email)
 	if err != nil {
-		s.logger.Error("generate code failed", "phone", phone, "error", err)
-		return err
+		s.logger.Warn("login failed - user not found", "email", email)
+		return nil, errors.New("неверные учетные данные")
 	}
 
-	codeHash := hashCode(code)
-	expiresAt := time.Now().Add(s.codeTTL)
-
-	if err := s.phoneRepo.Upsert(phone, codeHash, expiresAt); err != nil {
-		s.logger.Error("RequestPhoneCode failed", "phone", phone, "error", err)
-		return err
+	if user.IsBlocked {
+		return nil, errors.New("пользователь заблокирован")
 	}
 
-	message := fmt.Sprintf("Ваш код подтверждения: %s", code)
-
-	if err := s.smsSender.Send(phone, message); err != nil {
-		s.logger.Error(
-			"failed to send sms",
-			"phone", phone,
-			"error", err,
-		)
-		return err
+	if err := checkPassword(user.PasswordHash, password); err != nil {
+		s.logger.Warn("login failed - wrong password", "email", email)
+		return nil, errors.New("неверные учетные данные")
 	}
 
-	s.logger.Info("sms sent successfully", "phone", phone)
+	s.logger.Info(
+		"user logged in",
+		"user_id", user.ID,
+		"email", email,
+	)
 
-	return nil
+	return user, nil
+}
+/*
+package service
+
+import (
+	"errors"
+
+	"github.com/IslamCHup/coworking-manager-project/internal/repository"
+	"golang.org/x/crypto/bcrypt"
+)
+
+type AuthService interface {
+	Login(email, password string) (uint, error)
 }
 
-func (s *authService) VerifyPhoneCode(phone string, code string) (uint, error) {
-	phone = normalizePhone(phone)
-	code = strings.TrimSpace(code)
+type authService struct {
+	userRepo repository.UserRepository
+}
 
-	if phone == "" || code == "" {
-		return 0, errors.New("телефон или код не указаны")
-	}
+func NewAuthService(userRepo repository.UserRepository) AuthService {
+	return &authService{userRepo: userRepo}
+}
 
-	storedHash, expiresAt, attempts, err := s.phoneRepo.GetByPhone(phone)
+func (s *authService) Login(email, password string) (uint, error) {
+	user, err := s.userRepo.GetUserByEmail(email)
 	if err != nil {
-		s.logger.Warn("verification not found", "phone", phone, "error", err)
-		return 0, errors.New("код не найден")
+		return 0, errors.New("user not found")
 	}
 
-	if time.Now().After(expiresAt) {
-		if err := s.phoneRepo.DeleteByPhone(phone); err != nil {
-			s.logger.Error(
-				"failed to delete expired verification",
-				"phone", phone,
-				"error", err,
-			)
-		}
-		return 0, errors.New("код истек")
+	if err := bcrypt.CompareHashAndPassword(
+		[]byte(user.PasswordHash),
+		[]byte(password),
+	); err != nil {
+		return 0, errors.New("invalid password")
 	}
 
-	if attempts >= s.maxAttempts {
-		if err := s.phoneRepo.DeleteByPhone(phone); err != nil {
-			s.logger.Error(
-				"failed to delete verification after max attempts",
-				"phone", phone,
-				"attempts", attempts,
-				"error", err,
-			)
-		}
-
-		s.logger.Warn(
-			"too many attempts",
-			"phone", phone,
-			"attempts", attempts,
-		)
-
-		return 0, errors.New("слишком много попыток")
-	}
-
-	if !compareCodeHash(storedHash, code) {
-		if err := s.phoneRepo.IncrementAttempts(phone); err != nil {
-			s.logger.Error(
-				"failed to increment attempts",
-				"phone", phone,
-				"error", err,
-			)
-		}
-		return 0, errors.New("неверный код")
-	}
-
-	if err := s.phoneRepo.DeleteByPhone(phone); err != nil {
-		s.logger.Error(
-			"failed to delete phone verification",
-			"phone", phone,
-			"error", err,
-		)
-	}
-
-	user, err := s.userRepo.GetUserByPhone(phone)
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			u := &models.User{Phone: phone}
-			if err := s.userRepo.CreateUser(u); err != nil {
-				s.logger.Error("create user failed", "phone", phone, "error", err)
-				return 0, err
-			}
-			s.logger.Info("user created on verify", "user_id", u.ID, "phone", phone)
-			return u.ID, nil
-		}
-
-		s.logger.Error("GetUserByPhone failed", "phone", phone, "error", err)
-		return 0, err
-	}
-
-	s.logger.Info("phone verified, user found", "user_id", user.ID, "phone", phone)
 	return user.ID, nil
 }
+*/

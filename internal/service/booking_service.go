@@ -17,7 +17,7 @@ type BookingService interface {
 	DeleteBooking(id uint) error
 	ListBooking(filter *models.FilterBooking) (*[]models.Booking, error)
 	UpdateBook(id uint, req *models.BookingReqUpdateDTO) error
-	UpdateStatus(id uint, status models.BookingStatusDTO) error
+	UpdateStatus(id uint, status models.BookingStatusUpdateDTO) error
 	UpdateBookingStatusWithBalance(id uint, newStatus models.BookingStatus) error
 }
 
@@ -48,7 +48,7 @@ func (s *bookingService) Create(id uint, req models.BookingReqDTO) (*models.Book
 		return nil, errors.New("неправильный формат времени, нужен YYYY-MM-DD HH")
 	}
 
-	duration := end.Sub(start)
+	duration := end.Sub(start).Hours()
 	if duration <= 0 {
 		return nil, errors.New("неверный диапазон времени: время окончания должно быть позже времени начала")
 	}
@@ -61,7 +61,7 @@ func (s *bookingService) Create(id uint, req models.BookingReqDTO) (*models.Book
 		return nil, errors.New("бронь просрочена")
 	}
 
-	if start.Hour() < 9 || end.Hour() > 17 {
+	if start.Hour() < 9 || end.Hour() > 18 {
 		return nil, errors.New("мы работаем с 9 до 18 часов")
 	}
 
@@ -89,16 +89,13 @@ func (s *bookingService) Create(id uint, req models.BookingReqDTO) (*models.Book
 		Status:    models.BookingNonActive,
 	}
 
-	// Получаем информацию о месте для расчета цены
 	place, err := s.placeRepo.GetPlaceByID(req.PlaceID)
 	if err != nil {
 		s.logger.Error("failed to get place for price calculation", "place_id", req.PlaceID, "error", err)
 		return nil, errors.New("место не найдено")
 	}
 
-	durationHours := booking.EndTime.Sub(booking.StartTime).Hours()
-	// Цена в копейках: часы * цена за час места в копейках
-	booking.TotalPrice = int(durationHours * float64(place.PricePerHour))
+	booking.TotalPrice = int(duration * float64(place.PricePerHour))
 
 	if err := s.repo.CreateBooking(booking); err != nil {
 		s.logger.Error("Create booking failed", "error", err, "user_id", req.UserID, "place_id", req.PlaceID)
@@ -135,7 +132,7 @@ func (s *bookingService) GetBookingById(id uint) (*models.BookingResDTO, error) 
 
 	bookingResDTO.User = &models.UserResponseDTO{
 		ID:        booking.User.ID,
-		Phone:     booking.User.Phone,
+		Email:     booking.User.Email,
 		FirstName: booking.User.FirstName,
 		LastName:  booking.User.LastName,
 		Balance:   booking.User.Balance,
@@ -240,7 +237,7 @@ func (s *bookingService) UpdateBook(id uint, req *models.BookingReqUpdateDTO) er
 	return nil
 }
 
-func (s *bookingService) UpdateStatus(id uint, status models.BookingStatusDTO) error {
+func (s *bookingService) UpdateStatus(id uint, status models.BookingStatusUpdateDTO) error {
 	booking, err := s.repo.GetBookingById(id)
 	if err != nil {
 		return err

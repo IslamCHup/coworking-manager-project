@@ -97,13 +97,13 @@ func (r *bookingRepository) Delete(id uint) error {
 func (r *bookingRepository) ListBooking(filter *models.FilterBooking) (*[]models.Booking, error) {
 	if filter == nil {
 		filter = &models.FilterBooking{
-			Limit:  20,
+			Limit:  400,
 			Offset: 0,
 			SortBy: "start_time",
 			Order:  "asc",
 		}
 	}
-	if filter.Limit <= 0 || filter.Limit > 100 {
+	if filter.Limit <= 0 || filter.Limit > 500 {
 		filter.Limit = 20
 	}
 	if filter.Offset < 0 {
@@ -125,12 +125,14 @@ func (r *bookingRepository) ListBooking(filter *models.FilterBooking) (*[]models
 	if filter.Status != nil {
 		query = query.Where("status = ?", *filter.Status)
 	}
+
 	if filter.PriceMin != nil {
 		query = query.Where("total_price >= ?", *filter.PriceMin)
 	}
 	if filter.PriceMax != nil {
 		query = query.Where("total_price <= ?", *filter.PriceMax)
 	}
+
 	if filter.StartTime != nil && filter.EndTime != nil {
 		query = query.Where("start_time >= ? AND end_time <= ?", *filter.StartTime, *filter.EndTime)
 	} else if filter.StartTime != nil {

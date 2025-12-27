@@ -25,7 +25,7 @@ func RegisterRoutes(
 	placeHandler := NewPlaceHandler(placeService, logger)
 	placeHandler.RegisterRoutes(router)
 
-	authHandler := NewAuthHandler(authService, logger, refreshService)
+	authHandler := NewAuthHandler(authService, refreshService, logger)
 	authHandler.RegisterRoutes(router)
 	refreshHandler := NewRefreshHandler(refreshService, logger)
 	refreshHandler.RegisterRoutes(router)
@@ -37,7 +37,7 @@ func RegisterRoutes(
 	reviewHandler := NewReviewHandler(reviewService, logger)
 
 	protected := router.Group("/")
-	protected.Use(middleware.AuthMiddleware())
+	protected.Use(middleware.RequireAuthMiddleware())
 
 	users := protected.Group("/users")
 	userHandler.RegisterRoutes(users)

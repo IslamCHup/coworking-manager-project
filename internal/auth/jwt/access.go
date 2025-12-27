@@ -2,6 +2,7 @@ package jwt
 
 import (
 	"errors"
+	"fmt"
 	"os"
 	"time"
 
@@ -13,7 +14,7 @@ type AccessClaims struct {
 	jwt.RegisteredClaims
 }
 
-func getAccessSecret() ([]byte, error) {
+func accessSecret() ([]byte, error) {
 	secret := os.Getenv("JWT_ACCESS_SECRET")
 	if secret == "" {
 		return nil, errors.New("JWT_ACCESS_SECRET is not set")
@@ -22,7 +23,7 @@ func getAccessSecret() ([]byte, error) {
 }
 
 func GenerateAccessToken(userID uint) (string, error) {
-	accessSecret, err := getAccessSecret()
+	secret, err := accessSecret()
 	if err != nil {
 		return "", err
 	}
@@ -30,44 +31,46 @@ func GenerateAccessToken(userID uint) (string, error) {
 	claims := AccessClaims{
 		UserID: userID,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(1 * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(accessSecret)
+
+	return token.SignedString(secret)
 }
 
 func ParseAccessToken(tokenString string) (*AccessClaims, error) {
-	if tokenString == "" {
-		return nil, errors.New("токен не указан")
-	}
+	fmt.Println("PARSE TOKEN CALLED")
+	fmt.Println("TOKEN STRING:", tokenString)
+	fmt.Println("ACCESS SECRET (PARSE):", os.Getenv("JWT_ACCESS_SECRET"))
 
-	accessSecret, err := getAccessSecret()
+	secret, err := accessSecret()
 	if err != nil {
+		fmt.Println("PARSE ERROR: secret error:", err)
 		return nil, err
 	}
 
 	token, err := jwt.ParseWithClaims(
 		tokenString,
 		&AccessClaims{},
-		func(t *jwt.Token) (interface{}, error) {
-			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, errors.New("неожиданный метод подписи")
-			}
-			return accessSecret, nil
+		func(token *jwt.Token) (interface{}, error) {
+			return secret, nil
 		},
 	)
 
 	if err != nil {
+		fmt.Println("PARSE ERROR:", err)
 		return nil, err
 	}
 
 	claims, ok := token.Claims.(*AccessClaims)
 	if !ok || !token.Valid {
-		return nil, errors.New("неверный токен")
+		fmt.Println("PARSE ERROR: invalid claims")
+		return nil, errors.New("invalid token")
 	}
 
+	fmt.Println("PARSE SUCCESS, USER:", claims.UserID)
 	return claims, nil
 }

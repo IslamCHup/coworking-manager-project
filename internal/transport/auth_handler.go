@@ -12,77 +12,88 @@ import (
 )
 
 type AuthHandler struct {
-	service        service.AuthService
-	logger         *slog.Logger
+	authService    service.AuthService
 	refreshService service.RefreshService
+	logger         *slog.Logger
 }
 
 func NewAuthHandler(
-	service service.AuthService,
-	logger *slog.Logger,
+	authService service.AuthService,
 	refreshService service.RefreshService,
+	logger *slog.Logger,
 ) *AuthHandler {
 	return &AuthHandler{
-		service:        service,
-		logger:         logger,
+		authService:    authService,
 		refreshService: refreshService,
+		logger:         logger,
 	}
 }
 
 func (h *AuthHandler) RegisterRoutes(r *gin.Engine) {
 	auth := r.Group("/auth")
 	{
-		auth.POST("/phone/request", h.RequestPhoneCode)
-		auth.POST("/phone/verify", h.VerifyPhoneCode)
+		auth.POST("/register", h.Register)
+		auth.POST("/login", h.Login)
 	}
 }
 
-func (h *AuthHandler) RequestPhoneCode(c *gin.Context) {
-	var req models.PhoneRequestDTO
+// -------------------- handlers --------------------
 
+func (h *AuthHandler) Register(c *gin.Context) {
+	var req models.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		h.logger.Warn("RequestPhoneCode invalid body", "error", err)
+		h.logger.Warn("invalid register body", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err := h.service.RequestPhoneCode(req.Phone); err != nil {
-		h.logger.Error(
-			"RequestPhoneCode failed",
-			"phone", req.Phone,
-			"error", err,
-		)
+	user, err := h.authService.Register(
+		req.FirstName,
+		req.LastName,
+		req.Email,
+		req.Password,
+	)
+	if err != nil {
+		h.logger.Error("register failed", "email", req.Email, "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	h.logger.Info("RequestPhoneCode success", "phone", req.Phone)
-	c.JSON(http.StatusOK, gin.H{"message": "код отправлен"})
+	h.respondWithTokens(c, user.ID)
 }
 
-func (h *AuthHandler) VerifyPhoneCode(c *gin.Context) {
-	var dto models.PhoneVerifyDTO
-	if err := c.ShouldBindJSON(&dto); err != nil {
+func (h *AuthHandler) Login(c *gin.Context) {
+	var req models.LoginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Warn("invalid login body", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	userID, err := h.service.VerifyPhoneCode(dto.Phone, dto.Code)
+	user, err := h.authService.Login(req.Email, req.Password)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		h.logger.Warn("login failed", "email", req.Email)
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid credentials"})
 		return
 	}
 
+	h.respondWithTokens(c, user.ID)
+}
+
+// -------------------- helpers --------------------
+
+func (h *AuthHandler) respondWithTokens(c *gin.Context, userID uint) {
 	accessToken, err := jwt.GenerateAccessToken(userID)
 	if err != nil {
-		h.logger.Error("GenerateAccessToken failed", "user_id", userID, "error", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось сгенерировать access token"})
+		h.logger.Error("access token generation failed", "user_id", userID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "access token error"})
 		return
 	}
 
 	refreshToken, err := h.refreshService.CreateForUser(userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось сгенерировать refresh token"})
+		h.logger.Error("refresh token generation failed", "user_id", userID, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "refresh token error"})
 		return
 	}
 

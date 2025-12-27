@@ -5,7 +5,6 @@ import (
 
 	"github.com/IslamCHup/coworking-manager-project/internal/config"
 	"github.com/IslamCHup/coworking-manager-project/internal/models"
-	"github.com/IslamCHup/coworking-manager-project/internal/notification"
 	"github.com/IslamCHup/coworking-manager-project/internal/repository"
 	"github.com/IslamCHup/coworking-manager-project/internal/service"
 	"github.com/IslamCHup/coworking-manager-project/internal/transport"
@@ -37,26 +36,12 @@ func main() {
 		&models.Booking{},
 		&models.Review{},
 		&models.Place{},
-		&models.PhoneVerification{},
 		&models.RefreshToken{},
 	); err != nil {
 		logger.Error("Ошибка при выполнении автомиграции", "error", err)
 		return
 	}
 
-	//подключение к sms aero Ислам, не трогать по братскии
-	email := os.Getenv("SMS_AERO_EMAIL")
-	apiKey := os.Getenv("SMS_AERO_API_KEY")
-	from := os.Getenv("SMS_AERO_FROM")
-	if from == "" {
-		from = "SMSAero"
-	}
-	smsSender := notification.NewSmsAeroSender(
-		email,
-		apiKey,
-		from,
-		logger,
-	)
 
 	// Инициализация репозиториев
 	bookingRepo := repository.NewBookingRepository(db, logger)
@@ -64,7 +49,6 @@ func main() {
 	userRepo := repository.NewUserRepository(db, logger)
 	placeRepo := repository.NewPlaceRepository(db, logger)
 	refreshRepo := repository.NewRefreshTokenRepository(db, logger)
-	phoneRepo := repository.NewPhoneVerificationRepository(db, logger)
 	reviewRepo := repository.NewReviewRepository(db)
 
 	// Инициализация сервисов
@@ -72,7 +56,7 @@ func main() {
 	placeService := service.NewPlaceService(placeRepo, db)
 	adminService := service.NewAdminService(adminRepo, logger)
 	userService := service.NewUserService(userRepo, logger)
-	authService := service.NewAuthService(phoneRepo, userRepo, logger, smsSender)
+	authService := service.NewAuthService(userRepo, logger)
 	refreshService := service.NewRefreshService(refreshRepo, logger)
 	reviewService := service.NewReviewService(db, reviewRepo)
 

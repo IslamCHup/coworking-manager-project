@@ -70,7 +70,7 @@ func (r *refreshTokenRepository) DeleteByHash(hash string) error {
 }
 
 func (r *refreshTokenRepository) DeleteByUserID(userID uint) error {
-	if err := r.db.Where("user_id = ?", userID).
+	if err := r.db.Unscoped().Where("user_id = ?", userID).
 		Delete(&models.RefreshToken{}).Error; err != nil {
 		r.logger.Error(
 			"delete refresh token by user failed",
