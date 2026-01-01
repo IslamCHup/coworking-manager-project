@@ -1,7 +1,6 @@
 package middleware
 
 import (
-	"fmt"
 	"strings"
 
 	authjwt "github.com/IslamCHup/coworking-manager-project/internal/auth/jwt"
@@ -25,8 +24,6 @@ func JWTMiddleware() gin.HandlerFunc {
 		claims, err := authjwt.ParseAccessToken(parts[1])
 		if err == nil && claims != nil {
 			c.Set("user_id", claims.UserID)
-		} else {
-			fmt.Println("JWT MIDDLEWARE: invalid token:", err)
 		}
 
 		c.Next()

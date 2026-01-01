@@ -5,11 +5,16 @@ import (
 
 	"github.com/IslamCHup/coworking-manager-project/internal/config"
 	"github.com/IslamCHup/coworking-manager-project/internal/models"
+
+	"github.com/IslamCHup/coworking-manager-project/internal/redis"
 	"github.com/IslamCHup/coworking-manager-project/internal/repository"
 	"github.com/IslamCHup/coworking-manager-project/internal/service"
 	"github.com/IslamCHup/coworking-manager-project/internal/transport"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+
+	"net/http"
+	_ "net/http/pprof"
 )
 
 func main() {
@@ -19,17 +24,23 @@ func main() {
 		logger.Error("env не найдено")
 	}
 
-	if os.Getenv("JWT_ACCESS_SECRET") == "" {
-		logger.Error("JWT_ACCESS_SECRET is not set")
-		os.Exit(1)
-	}
-
 	db := config.SetupDataBase(logger)
 	if db == nil {
 		logger.Error("Ошибка при установке базы данных: db is nil")
 	}
 
-	// Автомиграция моделей
+	redisClient, err := redis.New(os.Getenv("REDIS_ADDR"))
+	if err != nil {
+		logger.Error("redis unavailable:")
+		redisClient = nil
+	} else {
+		logger.Info("redis connected", "addr", os.Getenv("REDIS_ADDR"))
+	}
+
+	go func() {
+		http.ListenAndServe("localhost:6060", nil)
+	}()
+
 	if err := db.AutoMigrate(
 		&models.Admin{},
 		&models.User{},
@@ -42,8 +53,6 @@ func main() {
 		return
 	}
 
-
-	// Инициализация репозиториев
 	bookingRepo := repository.NewBookingRepository(db, logger)
 	adminRepo := repository.NewAdminRepository(db, logger)
 	userRepo := repository.NewUserRepository(db, logger)
@@ -51,8 +60,7 @@ func main() {
 	refreshRepo := repository.NewRefreshTokenRepository(db, logger)
 	reviewRepo := repository.NewReviewRepository(db)
 
-	// Инициализация сервисов
-	bookingService := service.NewBookingService(bookingRepo, placeRepo, db, logger)
+	bookingService := service.NewBookingService(bookingRepo, placeRepo, db, logger, redisClient)
 	placeService := service.NewPlaceService(placeRepo, db)
 	adminService := service.NewAdminService(adminRepo, logger)
 	userService := service.NewUserService(userRepo, logger)

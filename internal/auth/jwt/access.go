@@ -2,7 +2,6 @@ package jwt
 
 import (
 	"errors"
-	"fmt"
 	"os"
 	"time"
 
@@ -42,13 +41,9 @@ func GenerateAccessToken(userID uint) (string, error) {
 }
 
 func ParseAccessToken(tokenString string) (*AccessClaims, error) {
-	fmt.Println("PARSE TOKEN CALLED")
-	fmt.Println("TOKEN STRING:", tokenString)
-	fmt.Println("ACCESS SECRET (PARSE):", os.Getenv("JWT_ACCESS_SECRET"))
 
 	secret, err := accessSecret()
 	if err != nil {
-		fmt.Println("PARSE ERROR: secret error:", err)
 		return nil, err
 	}
 
@@ -61,16 +56,13 @@ func ParseAccessToken(tokenString string) (*AccessClaims, error) {
 	)
 
 	if err != nil {
-		fmt.Println("PARSE ERROR:", err)
 		return nil, err
 	}
 
 	claims, ok := token.Claims.(*AccessClaims)
 	if !ok || !token.Valid {
-		fmt.Println("PARSE ERROR: invalid claims")
 		return nil, errors.New("invalid token")
 	}
 
-	fmt.Println("PARSE SUCCESS, USER:", claims.UserID)
 	return claims, nil
 }

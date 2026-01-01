@@ -1,12 +1,16 @@
 package service
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/IslamCHup/coworking-manager-project/internal/models"
+	"github.com/IslamCHup/coworking-manager-project/internal/redis"
 	"github.com/IslamCHup/coworking-manager-project/internal/repository"
 	"gorm.io/gorm"
 )
@@ -15,7 +19,7 @@ type BookingService interface {
 	Create(id uint, req models.BookingReqDTO) (*models.Booking, error)
 	GetBookingById(id uint) (*models.BookingResDTO, error)
 	DeleteBooking(id uint) error
-	ListBooking(filter *models.FilterBooking) (*[]models.Booking, error)
+	ListBooking(filter *models.FilterBooking) ([]models.Booking, error)
 	UpdateBook(id uint, req *models.BookingReqUpdateDTO) error
 	UpdateStatus(id uint, status models.BookingStatusUpdateDTO) error
 	UpdateBookingStatusWithBalance(id uint, newStatus models.BookingStatus) error
@@ -26,14 +30,16 @@ type bookingService struct {
 	placeRepo repository.PlaceRepository
 	db        *gorm.DB
 	logger    *slog.Logger
+	redis     *redis.Client
 }
 
-func NewBookingService(repo repository.BookingRepository, placeRepo repository.PlaceRepository, db *gorm.DB, logger *slog.Logger) BookingService {
+func NewBookingService(repo repository.BookingRepository, placeRepo repository.PlaceRepository, db *gorm.DB, logger *slog.Logger, redis *redis.Client) BookingService {
 	return &bookingService{
 		repo:      repo,
 		placeRepo: placeRepo,
 		db:        db,
 		logger:    logger,
+		redis:     redis,
 	}
 }
 
@@ -65,20 +71,22 @@ func (s *bookingService) Create(id uint, req models.BookingReqDTO) (*models.Book
 		return nil, errors.New("мы работаем с 9 до 18 часов")
 	}
 
-	bookings, err := s.repo.ListBooking(nil)
+	status := models.BookingActive
+	filter := models.FilterBooking{
+		PlaceID:   &req.PlaceID,
+		StartTime: &start,
+		EndTime:   &end,
+		Status:    (*string)(&status),
+	}
+
+	bookings, err := s.repo.ListBooking(&filter)
 	if err != nil {
 		s.logger.Error("failed to list bookings for overlap check", "error", err)
 		return nil, err
 	}
-	if bookings != nil {
-		for _, v := range *bookings {
-			if v.PlaceID != req.PlaceID {
-				continue
-			}
-			if v.StartTime.Before(end) && v.EndTime.After(start) && v.Status == models.BookingActive {
-				return nil, errors.New("это время занято другими")
-			}
-		}
+
+	if len(bookings) > 0 {
+		return nil, errors.New("это время занято другими")
 	}
 
 	booking := &models.Booking{
@@ -153,17 +161,98 @@ func (s *bookingService) DeleteBooking(id uint) error {
 	return nil
 }
 
-func (s *bookingService) ListBooking(filter *models.FilterBooking) (*[]models.Booking, error) {
-	bookings, err := s.repo.ListBooking(filter)
+func (s *bookingService) ListBooking(filter *models.FilterBooking) ([]models.Booking, error) {
 
+	ctx := context.Background()
+
+	cacheKey := buildBookingCacheKey(filter)
+
+	if s.redis != nil {
+		cached, err := s.redis.Get(ctx, cacheKey).Result()
+		if err == nil {
+			s.logger.Info("ListBooking cache HIT", "key", cacheKey)
+
+			var bookings []models.Booking
+			if err := json.Unmarshal([]byte(cached), &bookings); err == nil {
+				return bookings, nil
+			}
+
+			s.logger.Error(
+				"failed to unmarshal bookings from cache",
+				"key", cacheKey,
+				"error", err,
+			)
+		} else {
+			s.logger.Error(
+				"redis GET error",
+				"key", cacheKey,
+				"error", err,
+			)
+		}
+	}
+
+	bookings, err := s.repo.ListBooking(filter)
 	if err != nil {
-		s.logger.Error("")
+		s.logger.Error("ListBooking repo error", "error", err)
 		return nil, err
+	}
+
+	// 4. Кладём в Redis ТОЛЬКО если кешируемо
+	if s.redis != nil {
+		data, err := json.Marshal(bookings)
+		if err != nil {
+			s.logger.Error("failed to marshal bookings for cache", "error", err)
+		} else {
+			if err := s.redis.Set(ctx, cacheKey, data, 2*time.Minute).Err(); err != nil {
+				s.logger.Error(
+					"failed to set bookings cache",
+					"key", cacheKey,
+					"error", err,
+				)
+			} else {
+				s.logger.Info("ListBooking cache SET", "key", cacheKey)
+			}
+		}
 	}
 
 	s.logger.Info("ListBooking success")
 	return bookings, nil
 }
+
+func buildBookingCacheKey(filter *models.FilterBooking) string {
+	parts := []string{"bookings", "v1"}
+
+	if filter.PlaceID != nil {
+		parts = append(parts, fmt.Sprintf("place:%d", *filter.PlaceID))
+	}
+
+	if filter.StartTime != nil && filter.EndTime != nil {
+		parts = append(parts, fmt.Sprintf(
+			"t:%d-%d", filter.StartTime.Unix(),filter.EndTime.Unix(),
+		))
+	}
+
+	if filter.Status != nil {
+		parts = append(parts, "status:"+strings.ToLower(*filter.Status))
+	}
+
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 20
+	}
+
+	offset := filter.Offset
+	if offset < 0 {
+		offset = 0
+	}
+
+	if offset == 0 {
+		parts = append(parts, fmt.Sprintf("lim:%d", limit))
+	}
+
+	return strings.Join(parts, ":")
+}
+
 
 func (s *bookingService) UpdateBook(id uint, req *models.BookingReqUpdateDTO) error {
 	booking, err := s.repo.GetBookingById(id)
@@ -202,20 +291,21 @@ func (s *bookingService) UpdateBook(id uint, req *models.BookingReqUpdateDTO) er
 			return errors.New("неверный диапазон времени: время окончания должно быть позже времени начала")
 		}
 
-		bookings, err := s.repo.ListBooking(nil)
+		status := models.BookingActive
+		filter := models.FilterBooking{
+			PlaceID:   req.PlaceID,
+			StartTime: &start,
+			EndTime:   &end,
+			Status:    (*string)(&status),
+		}
+
+		bookings, err := s.repo.ListBooking(&filter)
 		if err != nil {
 			s.logger.Error("failed to list bookings for overlap check", "error", err)
 			return err
 		}
-		if bookings != nil {
-			for _, v := range *bookings {
-				if v.ID == booking.ID || v.PlaceID != booking.PlaceID {
-					continue
-				}
-				if v.StartTime.Before(booking.EndTime) && v.EndTime.After(booking.StartTime) && v.Status == models.BookingActive {
-					return errors.New("это время занято другими")
-				}
-			}
+		if len(bookings) > 0 {
+			return errors.New("это время занято другими")
 		}
 
 		// Получаем информацию о месте для расчета цены

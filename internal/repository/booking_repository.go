@@ -11,7 +11,7 @@ import (
 
 type BookingRepository interface {
 	CreateBooking(req *models.Booking) error
-	ListBooking(filter *models.FilterBooking) (*[]models.Booking, error)
+	ListBooking(filter *models.FilterBooking) ([]models.Booking, error)
 	UpdateBook(id uint, req *models.Booking) error
 	Delete(id uint) error
 	GetBookingById(id uint) (*models.Booking, error)
@@ -94,17 +94,17 @@ func (r *bookingRepository) Delete(id uint) error {
 	return nil
 }
 
-func (r *bookingRepository) ListBooking(filter *models.FilterBooking) (*[]models.Booking, error) {
+func (r *bookingRepository) ListBooking(filter *models.FilterBooking) ([]models.Booking, error) {
 	if filter == nil {
 		filter = &models.FilterBooking{
-			Limit:  400,
+			Limit:  1000,
 			Offset: 0,
 			SortBy: "start_time",
 			Order:  "asc",
 		}
 	}
-	if filter.Limit <= 0 || filter.Limit > 500 {
-		filter.Limit = 20
+	if filter.Limit <= 0 || filter.Limit > 1000000 {
+		filter.Limit = 1000
 	}
 	if filter.Offset < 0 {
 		filter.Offset = 0
@@ -116,11 +116,14 @@ func (r *bookingRepository) ListBooking(filter *models.FilterBooking) (*[]models
 		filter.Order = "asc"
 	}
 
+	bookings := make([]models.Booking, 0, filter.Limit)
 	r.logger.Debug("ListBooking called", "filter", filter)
 
-	var bookings *[]models.Booking
+	query := r.db.Model(models.Booking{}).Select("bookings.id, bookings.user_id, bookings.place_id, bookings.start_time, bookings.end_time, bookings.status, bookings.total_price")
 
-	query := r.db.Model(models.Booking{}).Preload("User").Preload("Place")
+	if filter.Preload {
+		query = query.Joins("User").Joins("Place")
+	}
 
 	if filter.Status != nil {
 		query = query.Where("status = ?", *filter.Status)
@@ -134,11 +137,11 @@ func (r *bookingRepository) ListBooking(filter *models.FilterBooking) (*[]models
 	}
 
 	if filter.StartTime != nil && filter.EndTime != nil {
-		query = query.Where("start_time >= ? AND end_time <= ?", *filter.StartTime, *filter.EndTime)
+		query = query.Where("booking_range && tstzrange(?, ?, '[)')", *filter.StartTime, *filter.EndTime)
 	} else if filter.StartTime != nil {
-		query = query.Where("start_time >= ?", *filter.StartTime)
+		query = query.Where("booking_range && tstzrange(?, NULL, '[)')", *filter.StartTime)
 	} else if filter.EndTime != nil {
-		query = query.Where("end_time <= ?", *filter.EndTime)
+		query = query.Where("booking_range && tstzrange(NULL, ?, '[)')", *filter.EndTime)
 	}
 
 	r.logger.Debug("filters applied", "status", filter.Status, "price_min", filter.PriceMin, "price_max", filter.PriceMax, "start", filter.StartTime, "end", filter.EndTime)
@@ -158,7 +161,7 @@ func (r *bookingRepository) ListBooking(filter *models.FilterBooking) (*[]models
 		order = "asc"
 	}
 
-	query = query.Order(fmt.Sprintf("%s %s", sortBy, order))
+	query = query.Order(fmt.Sprintf("bookings.%s %s", sortBy, order))
 	r.logger.Debug("query ready", "order", fmt.Sprintf("%s %s", sortBy, order), "limit", filter.Limit, "offset", filter.Offset)
 
 	if filter.Limit > 0 {
@@ -167,14 +170,14 @@ func (r *bookingRepository) ListBooking(filter *models.FilterBooking) (*[]models
 	if filter.Offset > 0 {
 		query = query.Offset(filter.Offset)
 	}
-
+	//что-то тут тормозится при нагрузках
 	query = query.Find(&bookings)
 
 	if query.Error != nil {
 		r.logger.Error("ListBooking failed", "err", query.Error)
 		return nil, query.Error
 	}
-	r.logger.Info("ListBooking success", "count", len(*bookings), "limit", filter.Limit, "offset", filter.Offset)
+	r.logger.Info("ListBooking success", "count", len(bookings), "limit", filter.Limit, "offset", filter.Offset)
 	return bookings, nil
 }
 

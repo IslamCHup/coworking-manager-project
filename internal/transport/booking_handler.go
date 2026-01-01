@@ -103,9 +103,9 @@ func (h *BookingHandler) ListBooking(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
 	filter := models.FilterBooking{
 		Status:    q.Status,
+		Preload:   q.Preload,
 		PriceMin:  q.PriceMin,
 		PriceMax:  q.PriceMax,
 		StartTime: q.StartTime,
