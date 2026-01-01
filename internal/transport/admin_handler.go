@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/IslamCHup/coworking-manager-project/internal/middleware"
 	"github.com/IslamCHup/coworking-manager-project/internal/models"
 	"github.com/IslamCHup/coworking-manager-project/internal/service"
-	"github.com/IslamCHup/coworking-manager-project/internal/transport/middleware"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -63,13 +63,13 @@ func (h *AdminHandler) Login(c *gin.Context) {
 }
 
 func (h *AdminHandler) GetAllUsers(c *gin.Context) {
-    users, err := h.userService.GetAllUsers()
-    if err != nil {
-        h.logger.Error("Admin GetAllUsers failed", "error", err)
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось получить пользователей"})
-        return
-    }
-    c.JSON(http.StatusOK, users)
+	users, err := h.userService.GetAllUsers()
+	if err != nil {
+		h.logger.Error("Admin GetAllUsers failed", "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось получить пользователей"})
+		return
+	}
+	c.JSON(http.StatusOK, users)
 }
 
 func (h *AdminHandler) UpdateUser(c *gin.Context) {
@@ -259,32 +259,31 @@ func (h *AdminHandler) AdminUpdateBookingStatus(c *gin.Context) {
 }
 
 func (h *AdminHandler) UpdateUserBalance(c *gin.Context) {
-    idParam := c.Param("id")
-    userID64, err := strconv.ParseUint(idParam, 10, 32)
-    if err != nil {
-        h.logger.Warn("invalid user id", "id", idParam, "error", err)
-        c.JSON(http.StatusBadRequest, gin.H{"error": "неверный ID пользователя"})
-        return
-    }
+	idParam := c.Param("id")
+	userID64, err := strconv.ParseUint(idParam, 10, 32)
+	if err != nil {
+		h.logger.Warn("invalid user id", "id", idParam, "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "неверный ID пользователя"})
+		return
+	}
 
-    var req models.UpdateBalanceDTO
-    if err := c.ShouldBindJSON(&req); err != nil {
-        h.logger.Warn("UpdateUserBalance invalid body", "error", err)
-        c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-        return
-    }
+	var req models.UpdateBalanceDTO
+	if err := c.ShouldBindJSON(&req); err != nil {
+		h.logger.Warn("UpdateUserBalance invalid body", "error", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
+	if req.Amount == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "amount не может быть 0"})
+		return
+	}
 
-    if req.Amount == 0 {
-        c.JSON(http.StatusBadRequest, gin.H{"error": "amount не может быть 0"})
-        return
-    }
+	if err := h.userService.UpdateUserBalance(uint(userID64), req.Amount); err != nil {
+		h.logger.Error("UpdateUserBalance failed", "user_id", userID64, "amount", req.Amount, "error", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось изменить баланс"})
+		return
+	}
 
-    if err := h.userService.UpdateUserBalance(uint(userID64), req.Amount); err != nil {
-        h.logger.Error("UpdateUserBalance failed", "user_id", userID64, "amount", req.Amount, "error", err)
-        c.JSON(http.StatusInternalServerError, gin.H{"error": "не удалось изменить баланс"})
-        return
-    }
-
-    c.JSON(http.StatusOK, gin.H{"message": "баланс обновлен"})
+	c.JSON(http.StatusOK, gin.H{"message": "баланс обновлен"})
 }

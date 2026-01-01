@@ -7,3 +7,5 @@ main
 seed
 /cmd/api/tmp
 /tmp
+.air.toml
+.DS_Store

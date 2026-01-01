@@ -20,7 +20,8 @@ type userService struct {
 	logger *slog.Logger
 }
 
-func NewUserService(repo repository.UserRepository,
+func NewUserService(
+	repo repository.UserRepository,
 	logger *slog.Logger,
 ) UserService {
 	return &userService{
@@ -36,7 +37,6 @@ func (s *userService) GetUserByID(userID uint) (*models.UserResponseDTO, error) 
 	}
 
 	bookings := make([]models.BookingResDTO, 0, len(user.Bookings))
-
 	for _, b := range user.Bookings {
 		bookings = append(bookings, models.BookingResDTO{
 			UserID:     b.UserID,
@@ -50,9 +50,9 @@ func (s *userService) GetUserByID(userID uint) (*models.UserResponseDTO, error) 
 
 	return &models.UserResponseDTO{
 		ID:        user.ID,
-		Phone:     user.Phone,
 		FirstName: user.FirstName,
 		LastName:  user.LastName,
+		Email:     user.Email,
 		Balance:   user.Balance,
 		Bookings:  bookings,
 	}, nil
@@ -111,13 +111,12 @@ func (s *userService) GetAllUsers() ([]models.UserResponseDTO, error) {
 	}
 
 	result := make([]models.UserResponseDTO, 0, len(users))
-
 	for _, u := range users {
 		result = append(result, models.UserResponseDTO{
 			ID:        u.ID,
-			Phone:     u.Phone,
 			FirstName: u.FirstName,
 			LastName:  u.LastName,
+			Email:     u.Email,
 			Balance:   u.Balance,
 		})
 	}
@@ -127,9 +126,19 @@ func (s *userService) GetAllUsers() ([]models.UserResponseDTO, error) {
 
 func (s *userService) UpdateUserBalance(userID uint, amount int) error {
 	if err := s.repo.UpdateUserBalance(userID, amount); err != nil {
-		s.logger.Error("UpdateUserBalance failed", "user_id", userID, "amount", amount, "error", err)
+		s.logger.Error(
+			"UpdateUserBalance failed",
+			"user_id", userID,
+			"amount", amount,
+			"error", err,
+		)
 		return err
 	}
-	s.logger.Info("UpdateUserBalance success", "user_id", userID, "amount", amount)
+
+	s.logger.Info(
+		"UpdateUserBalance success",
+		"user_id", userID,
+		"amount", amount,
+	)
 	return nil
 }

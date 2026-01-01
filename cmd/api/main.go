@@ -5,12 +5,16 @@ import (
 
 	"github.com/IslamCHup/coworking-manager-project/internal/config"
 	"github.com/IslamCHup/coworking-manager-project/internal/models"
-	"github.com/IslamCHup/coworking-manager-project/internal/notification"
+
+	"github.com/IslamCHup/coworking-manager-project/internal/redis"
 	"github.com/IslamCHup/coworking-manager-project/internal/repository"
 	"github.com/IslamCHup/coworking-manager-project/internal/service"
 	"github.com/IslamCHup/coworking-manager-project/internal/transport"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
+
+	"net/http"
+	_ "net/http/pprof"
 )
 
 func main() {
@@ -20,59 +24,47 @@ func main() {
 		logger.Error("env не найдено")
 	}
 
-	if os.Getenv("JWT_ACCESS_SECRET") == "" {
-		logger.Error("JWT_ACCESS_SECRET is not set")
-		os.Exit(1)
-	}
-
 	db := config.SetupDataBase(logger)
 	if db == nil {
 		logger.Error("Ошибка при установке базы данных: db is nil")
 	}
 
-	// Автомиграция моделей
+	redisClient, err := redis.New(os.Getenv("REDIS_ADDR"))
+	if err != nil {
+		logger.Error("redis unavailable:")
+		redisClient = nil
+	} else {
+		logger.Info("redis connected", "addr", os.Getenv("REDIS_ADDR"))
+	}
+
+	go func() {
+		http.ListenAndServe("localhost:6060", nil)
+	}()
+
 	if err := db.AutoMigrate(
 		&models.Admin{},
 		&models.User{},
 		&models.Booking{},
 		&models.Review{},
 		&models.Place{},
-		&models.PhoneVerification{},
 		&models.RefreshToken{},
 	); err != nil {
 		logger.Error("Ошибка при выполнении автомиграции", "error", err)
 		return
 	}
 
-	//подключение к sms aero Ислам, не трогать по братскии
-	email := os.Getenv("SMS_AERO_EMAIL")
-	apiKey := os.Getenv("SMS_AERO_API_KEY")
-	from := os.Getenv("SMS_AERO_FROM")
-	if from == "" {
-		from = "SMSAero"
-	}
-	smsSender := notification.NewSmsAeroSender(
-		email,
-		apiKey,
-		from,
-		logger,
-	)
-
-	// Инициализация репозиториев
 	bookingRepo := repository.NewBookingRepository(db, logger)
 	adminRepo := repository.NewAdminRepository(db, logger)
 	userRepo := repository.NewUserRepository(db, logger)
 	placeRepo := repository.NewPlaceRepository(db, logger)
 	refreshRepo := repository.NewRefreshTokenRepository(db, logger)
-	phoneRepo := repository.NewPhoneVerificationRepository(db, logger)
 	reviewRepo := repository.NewReviewRepository(db)
 
-	// Инициализация сервисов
-	bookingService := service.NewBookingService(bookingRepo, placeRepo, db, logger)
+	bookingService := service.NewBookingService(bookingRepo, placeRepo, db, logger, redisClient)
 	placeService := service.NewPlaceService(placeRepo, db)
 	adminService := service.NewAdminService(adminRepo, logger)
 	userService := service.NewUserService(userRepo, logger)
-	authService := service.NewAuthService(phoneRepo, userRepo, logger, smsSender)
+	authService := service.NewAuthService(userRepo, logger)
 	refreshService := service.NewRefreshService(refreshRepo, logger)
 	reviewService := service.NewReviewService(db, reviewRepo)
 

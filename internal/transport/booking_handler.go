@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/IslamCHup/coworking-manager-project/internal/middleware"
 	"github.com/IslamCHup/coworking-manager-project/internal/models"
 	"github.com/IslamCHup/coworking-manager-project/internal/service"
 )
@@ -20,24 +21,36 @@ func NewBookingHandler(service service.BookingService, logger *slog.Logger) *Boo
 	return &BookingHandler{service: service, logger: logger}
 }
 
-func (h BookingHandler) RegisterRoutes(r *gin.Engine) {
-	booking := r.Group("/booking")
+func (h *BookingHandler) RegisterRoutes(r *gin.Engine) {
+	r.Use(middleware.JWTMiddleware())
+
+	booking := r.Group("/bookings")
 	{
-		booking.POST("/", h.Create)
 		booking.GET("/:id", h.GetByID)
-		booking.DELETE("/:id", h.DeleteBooking)
 		booking.GET("/", h.ListBooking)
-		booking.PATCH("/:id", h.Update)
-		booking.PATCH("/status/:id", h.UpdateStatus)
+	}
+
+	protected := r.Group("/bookings")
+	protected.Use(middleware.RequireAuthMiddleware())
+	{
+		protected.POST("/", h.Create)
+		protected.DELETE("/:id", h.DeleteBooking)
+		protected.PATCH("/:id", h.Update)
+		protected.PATCH("/status/:id", h.UpdateStatus)
 	}
 }
 
 func (h *BookingHandler) GetByID(c *gin.Context) {
-	id := c.MustGet("userID").(uint)
+	userIDAny, ok := c.Get("user_id")
+	if !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+	userID := userIDAny.(uint)
 
-	booking, err := h.service.GetBookingById(uint(id))
+	booking, err := h.service.GetBookingById(userID)
 	if err != nil {
-		h.logger.Error("GetBooking failed", "error", err, "id", id)
+		h.logger.Error("GetBooking failed", "error", err)
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
@@ -48,7 +61,7 @@ func (h *BookingHandler) GetByID(c *gin.Context) {
 }
 
 func (h *BookingHandler) DeleteBooking(c *gin.Context) {
-	id := c.MustGet("userID").(uint)
+	id := c.MustGet("user_id").(uint)
 
 	if err := h.service.DeleteBooking(uint(id)); err != nil {
 		h.logger.Error("DeleteBooking failed", "error", err, "id", id)
@@ -71,7 +84,7 @@ func (h *BookingHandler) Create(c *gin.Context) {
 		return
 	}
 
-	booking, err := h.service.Create(c.MustGet("UserID").(uint), req)
+	booking, err := h.service.Create(c.MustGet("user_id").(uint), req)
 	if err != nil {
 		h.logger.Error("CreateBooking failed", "error", err)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -90,9 +103,9 @@ func (h *BookingHandler) ListBooking(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
 	filter := models.FilterBooking{
 		Status:    q.Status,
+		Preload:   q.Preload,
 		PriceMin:  q.PriceMin,
 		PriceMax:  q.PriceMax,
 		StartTime: q.StartTime,
@@ -102,7 +115,6 @@ func (h *BookingHandler) ListBooking(c *gin.Context) {
 		SortBy:    q.SortBy,
 		Order:     q.Order,
 	}
-
 	booking, err := h.service.ListBooking(&filter)
 
 	if err != nil {
@@ -114,8 +126,7 @@ func (h *BookingHandler) ListBooking(c *gin.Context) {
 }
 
 func (h *BookingHandler) Update(c *gin.Context) {
-	id := c.MustGet("userID").(uint)
-
+	id := c.MustGet("user_id").(uint)
 
 	var req models.BookingReqUpdateDTO
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -143,7 +154,7 @@ func (h *BookingHandler) UpdateStatus(c *gin.Context) {
 	}
 	id, _ := strconv.ParseUint(idStr, 10, 64)
 
-	var status models.BookingStatusDTO
+	var status models.BookingStatusUpdateDTO
 
 	if err := c.ShouldBindJSON(&status); err != nil {
 		h.logger.Error("UpdateBooking invalid body", "error", err)
