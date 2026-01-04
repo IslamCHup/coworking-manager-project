@@ -112,6 +112,12 @@ func (s *bookingService) Create(id uint, req models.BookingReqDTO) (*models.Book
 
 	s.logger.Info("Create booking success", "booking_id", booking.ID)
 
+	// Инвалидируем кэш после успешного создания
+	if s.redis != nil {
+		ctx := context.Background()
+		s.invalidateBookingCache(ctx)
+	}
+
 	return booking, nil
 }
 
@@ -157,6 +163,11 @@ func (s *bookingService) DeleteBooking(id uint) error {
 	}
 
 	s.logger.Info("booking deleted")
+
+	if s.redis != nil {
+		ctx := context.Background()
+		s.invalidateBookingCache(ctx)
+	}
 
 	return nil
 }
@@ -253,6 +264,41 @@ func buildBookingCacheKey(filter *models.FilterBooking) string {
 	return strings.Join(parts, ":")
 }
 
+// invalidateBookingCache удаляет все ключи кэша бронирований по префиксу bookings:v1*
+func (s *bookingService) invalidateBookingCache(ctx context.Context) {
+	if s.redis == nil {
+		return
+	}
+
+	var cursor uint64
+	total := 0
+	for {
+		keys, cur, err := s.redis.Scan(ctx, cursor, "bookings:v1*", 100).Result()
+		if err != nil {
+			s.logger.Error("redis SCAN error", "error", err)
+			return
+		}
+
+		if len(keys) > 0 {
+			if err := s.redis.Del(ctx, keys...).Err(); err != nil {
+				s.logger.Error("failed to delete cache keys", "count", len(keys), "error", err)
+			} else {
+				total += len(keys)
+				s.logger.Info("invalidated booking cache keys", "deleted", len(keys))
+			}
+		}
+
+		cursor = cur
+		if cursor == 0 {
+			break
+		}
+	}
+
+	if total > 0 {
+		s.logger.Info("total booking cache keys invalidated", "count", total)
+	}
+}
+
 
 func (s *bookingService) UpdateBook(id uint, req *models.BookingReqUpdateDTO) error {
 	booking, err := s.repo.GetBookingById(id)
@@ -324,6 +370,11 @@ func (s *bookingService) UpdateBook(id uint, req *models.BookingReqUpdateDTO) er
 		return err
 	}
 
+	if s.redis != nil {
+		ctx := context.Background()
+		s.invalidateBookingCache(ctx)
+	}
+
 	return nil
 }
 
@@ -346,6 +397,10 @@ func (s *bookingService) UpdateStatus(id uint, status models.BookingStatusUpdate
 		if err := s.repo.UpdateBook(booking.ID, booking); err != nil {
 			return err
 		}
+		if s.redis != nil {
+			ctx := context.Background()
+			s.invalidateBookingCache(ctx)
+		}
 		return nil
 	default:
 		return errors.New("неверный статус бронирования")
@@ -354,7 +409,7 @@ func (s *bookingService) UpdateStatus(id uint, status models.BookingStatusUpdate
 
 func (s *bookingService) UpdateBookingStatusWithBalance(id uint, newStatus models.BookingStatus) error {
 	// Начинаем транзакцию
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	err := s.db.Transaction(func(tx *gorm.DB) error {
 		// Получаем бронь в рамках транзакции
 		var booking models.Booking
 		if err := tx.Preload("User").Preload("Place").Where("id = ?", id).First(&booking).Error; err != nil {
@@ -427,4 +482,16 @@ func (s *bookingService) UpdateBookingStatusWithBalance(id uint, newStatus model
 
 		return nil
 	})
+
+	if err != nil {
+		return err
+	}
+
+	// Инвалидируем кэш после успешной транзакции
+	if s.redis != nil {
+		ctx := context.Background()
+		s.invalidateBookingCache(ctx)
+	}
+
+	return nil
 }
