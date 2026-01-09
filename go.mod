@@ -1,6 +1,6 @@
 module github.com/IslamCHup/coworking-manager-project
 
-go 1.25.1
+go 1.25
 
 require (
 	github.com/brianvoe/gofakeit/v6 v6.28.0
