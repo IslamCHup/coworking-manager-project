@@ -264,7 +264,6 @@ func buildBookingCacheKey(filter *models.FilterBooking) string {
 	return strings.Join(parts, ":")
 }
 
-// invalidateBookingCache удаляет все ключи кэша бронирований по префиксу bookings:v1*
 func (s *bookingService) invalidateBookingCache(ctx context.Context) {
 	if s.redis == nil {
 		return
