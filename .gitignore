@@ -9,3 +9,4 @@ seed
 /tmp
 .air.toml
 .DS_Store
+coverage.out
