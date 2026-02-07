@@ -13,7 +13,7 @@ Backend-сервис для управления коворкингом.
 
 ## Архитектура
 
-Проект построен с разделением ответственности на слои (Layered Architecture/Clean Architecture)
+Проект построен с разделением ответственности на слои (Layered Architecture/Clean Architecture).
 
 ---
 
