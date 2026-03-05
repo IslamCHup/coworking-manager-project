@@ -15,7 +15,7 @@ help:
 	@echo "  make dev            - Запустить в режиме разработки (air)"
 	@echo "  make docker-build   - Собрать Docker образ"
 	@echo "  make docker-run     - Запустить контейнер Docker"
-	@echo "  make clean          - Очистить временные файлы"
+	@echo "  make clean          - Очистить временные файлы app"
 
 build:
 	go build -o bin/coworking-manager ./cmd/api/main.go
@@ -62,3 +62,4 @@ clean:
 	rm -f coverage.out
 	go clean
 	rm -rf vendor/
+
